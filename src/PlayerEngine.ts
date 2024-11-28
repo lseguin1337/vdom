@@ -85,7 +85,7 @@ function Event(eventType: RecordingEventType) {
   };
 }
 
-export interface VDOM {
+export interface VirtualDOM {
   nodes: Nodes;
   customElements: string[];
   stylesheets: StyleSheets;
@@ -94,7 +94,7 @@ export interface VDOM {
   rootId: number | undefined;
 }
 
-export function createVDOM(): VDOM {
+export function createVirtualDOM(): VirtualDOM {
   return {
     nodes: {},
     customElements: [],
@@ -105,8 +105,8 @@ export function createVDOM(): VDOM {
   };
 }
 
-export class VirtualDOM {
-  private state: VDOM = createVDOM();
+export class PlaybackEngine {
+  private state: VirtualDOM = createVirtualDOM();
   private nodeDirty = false;
 
   constructor() {}
@@ -153,7 +153,7 @@ export class VirtualDOM {
     this.state = { ...this.state, rootId };
   }
 
-  getDOM() {
+  getVirtualDOM() {
     return this.state;
   }
 
@@ -168,7 +168,7 @@ export class VirtualDOM {
   }
 
   clear() {
-    this.state = createVDOM();
+    this.state = createVirtualDOM();
   }
 
   @Event(RecordingEventType.INITIAL_DOM)
@@ -322,6 +322,7 @@ export class VirtualDOM {
       this.nodes = Object.assign({}, this.nodes);
       this.nodeDirty = false;
     }
+    return this;
   }
 
   private registerNodes(root: SerializedNode, parentId?: VNodeId) {
@@ -331,5 +332,5 @@ export class VirtualDOM {
 }
 
 function getMethodName(eventType: RecordingEventType): keyof VirtualDOM | undefined {
-  return (VirtualDOM as any).__events[eventType];
+  return (PlaybackEngine as any).__events[eventType];
 }

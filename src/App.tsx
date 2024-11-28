@@ -1,24 +1,20 @@
 import { useMemo, useState } from 'react';
 import { RenderDOM } from './Render'
-import { VirtualDOM } from './VirtualDOM';
+import { PlaybackEngine } from './PlayerEngine';
 import { recordingEvents } from './events';
 
-const vdom = new VirtualDOM();
+const playerEngine = new PlaybackEngine();
 
 function App() {
   const [isShort, setIsShort] = useState(false);
-  const dom = useMemo(() => {
-    if (isShort) {
-      vdom.apply(recordingEvents.slice(0, 1));
-    } else {
-      vdom.apply(recordingEvents);
-    }
-    return vdom;
+  const virtualDOM = useMemo(() => {
+    const events = isShort ? recordingEvents.slice(0, 1) : recordingEvents;
+    return playerEngine.apply(events).getVirtualDOM();
   }, [isShort]);
 
   return (<>
     <button onClick={() => setIsShort((isShort) => !isShort)}>Toggle</button>
-    <RenderDOM vdom={dom.getDOM()}></RenderDOM>
+    <RenderDOM vdom={virtualDOM}></RenderDOM>
   </>);
 }
 

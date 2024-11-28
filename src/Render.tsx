@@ -1,7 +1,7 @@
 
 import { Store, useStore } from '@tanstack/react-store';
-import { createContext, createElement, createRef, FC, forwardRef, useContext, useEffect, useMemo } from 'react';
-import { createVDOM, VDOM } from './VirtualDOM';
+import { createContext, createElement, createRef, FC, useContext, useEffect, useMemo } from 'react';
+import { createVirtualDOM, VirtualDOM } from './PlayerEngine';
 
 type RC = FC<{ id: number }>;
 
@@ -41,7 +41,7 @@ function useNativeNode(node: Node & { [key: string]: any }) {
   return createElement('cs-element-placeholder', { ref });
 }
 
-const RenderingContext = createContext<Store<VDOM>>(null as unknown as Store<VDOM>);
+const RenderingContext = createContext<Store<VirtualDOM>>(null as unknown as Store<VirtualDOM>);
 
 const RenderComment: RC = ({ id }) => {
   const commentData = useCharacterData(id);
@@ -190,8 +190,8 @@ const RenderNode: RC = ({ id }) => {
   return (<SpecializedNode id={id} />);
 };
 
-export const RenderDOM: FC<{ vdom: VDOM }> = ({ vdom }) => {
-  const store = useMemo(() => new Store<VDOM>(createVDOM()), []);
+export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
+  const store = useMemo(() => new Store<VirtualDOM>(createVirtualDOM()), []);
   useEffect(() => store.setState(() => vdom), [store, vdom]);
   const rootNode = useStore(store, ({ nodes, rootId }) => rootId && nodes[rootId]);
 
