@@ -169,6 +169,7 @@ export class PlaybackEngine {
 
   clear() {
     this.state = createVirtualDOM();
+    return this;
   }
 
   @Event(RecordingEventType.INITIAL_DOM)
@@ -189,7 +190,6 @@ export class PlaybackEngine {
   @Event(RecordingEventType.MUTATION_MOVE)
   mutationMove(nodeId: number, nextSibling: number, parentId: number) {
     const node = this.getNode(nodeId);
-    console.log('mutationMove', node.parentId, parentId, nextSibling);
     this.insertBefore(node, parentId, nextSibling);
   }
 
@@ -198,31 +198,6 @@ export class PlaybackEngine {
     const node = this.getNode(nodeId);
     this.detachNode(node);
     // TODO: remove the node from the store
-  }
-
-  private insertBefore(node: VNode, parentId: VNodeId, nextSibling?: VNodeId) {
-    if (node.parentId)
-      this.detachNode(node);
-    node.parentId = parentId;
-    const parent = this.getNode(parentId);
-    const siblings = parent.children || [];
-    const index = nextSibling ? siblings.indexOf(nextSibling) : -1;
-    if (index > -1) {
-      const prevSiblings = siblings!.slice(0, index);
-      const nextSiblings = siblings!.slice(index);
-      parent.children = [...prevSiblings, node.id, ...nextSiblings];
-    } else {
-      parent.children = [...siblings, node.id];
-    }
-  }
-
-  private detachNode(node: VNode) {
-    const parentId = node.parentId;
-    if (parentId) {
-      const parent = this.getNode(parentId);
-      parent.children = parent.children?.filter(c => c !== node.id);
-      node.parentId = undefined;
-    }
   }
 
   @Event(RecordingEventType.MUTATION_CHARACTER_DATA)
@@ -323,6 +298,31 @@ export class PlaybackEngine {
       this.nodeDirty = false;
     }
     return this;
+  }
+
+  private insertBefore(node: VNode, parentId: VNodeId, nextSibling?: VNodeId) {
+    if (node.parentId)
+      this.detachNode(node);
+    node.parentId = parentId;
+    const parent = this.getNode(parentId);
+    const siblings = parent.children || [];
+    const index = nextSibling ? siblings.indexOf(nextSibling) : -1;
+    if (index > -1) {
+      const prevSiblings = siblings!.slice(0, index);
+      const nextSiblings = siblings!.slice(index);
+      parent.children = [...prevSiblings, node.id, ...nextSiblings];
+    } else {
+      parent.children = [...siblings, node.id];
+    }
+  }
+
+  private detachNode(node: VNode) {
+    const parentId = node.parentId;
+    if (parentId) {
+      const parent = this.getNode(parentId);
+      parent.children = parent.children?.filter(c => c !== node.id);
+      node.parentId = undefined;
+    }
   }
 
   private registerNodes(root: SerializedNode, parentId?: VNodeId) {
