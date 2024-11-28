@@ -56,5 +56,6 @@ const mutation2 = createEvent(RecordingEventType.MUTATION_INSERT, divContainer.c
 const mutation3 = createEvent(RecordingEventType.MUTATION_REMOVE, mutation1.args[2]);
 const mutation4 = createEvent(RecordingEventType.MUTATION_CHARACTER_DATA, yoloComment.csId, ' yolo2 ');
 const mutation5 = createEvent(RecordingEventType.MUTATION_MOVE, yoloComment.csId, firstText.csId, divContainer.csId);
+const mutation6 = createEvent(RecordingEventType.MUTATION_ATTRIBUTE, divContainer.csId, null, 'data-href', 'the new attr value');
 
-export const recordingEvents = [initialDom, mutation1, mutation2, mutation3, mutation4, mutation5];
+export const recordingEvents = [initialDom, mutation1, mutation2, mutation3, mutation4, mutation5, mutation6];

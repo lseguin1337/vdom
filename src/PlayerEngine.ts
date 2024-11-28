@@ -32,7 +32,7 @@ interface VNode {
   data?: string;
   parentId?: VNodeId;
   shadowRoot?: VNodeId;
-  attributes?: VAttr[];
+  attributes?: { [name: string]: string }; // TODO: do something to handle namespace
   children?: VNodeId[];
   adoptedStylesheets?: number[];
   value?: string;
@@ -204,6 +204,18 @@ export class PlaybackEngine {
   mutationCharacterData(nodeId: number, data: string) {
     const node = this.getNode(nodeId);
     node.data = data;
+  }
+
+  @Event(RecordingEventType.MUTATION_ATTRIBUTE)
+  mutationAttribute(nodeId: number, _attrNamespace: string, attrName: string, attrValue: string) {
+    // TODO: handle namespaceURI
+    const node = this.getNode(nodeId);
+    if (attrValue === null || attrValue === undefined) {
+      node.attributes = { ...node.attributes };
+      delete node.attributes[attrName];
+    } else {
+      node.attributes = { ...node.attributes, [attrName]: attrValue };
+    }
   }
 
   @Event(RecordingEventType.ATTACH_SHADOW)

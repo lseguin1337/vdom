@@ -6,7 +6,7 @@ import { recordingEvents } from './events';
 const playerEngine = new PlaybackEngine();
 
 function App() {
-  const [renderAt, setRenderAt] = useState(recordingEvents.length - 1);
+  const [renderAt, setRenderAt] = useState(recordingEvents.length);
   const virtualDOM = useMemo(() => {
     const events = recordingEvents.slice(0, renderAt);
     if (events.length === 0)
@@ -18,7 +18,8 @@ function App() {
     <h1>
       render at index:
       <select value={renderAt} onChange={(event) => setRenderAt(+event.target.value)}>
-        {recordingEvents.map((_, index) => (<option key={index} value={index}>{index}</option>))}
+        <option key={0} value={0}>{0}</option>
+        {recordingEvents.map((_, index) => (<option key={index + 1} value={index + 1}>{index + 1}</option>))}
       </select>
     </h1>
     <RenderDOM vdom={virtualDOM}></RenderDOM>
