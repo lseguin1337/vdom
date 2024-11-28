@@ -18,7 +18,7 @@ function App() {
 
   return (<>
     <button onClick={() => setIsShort((isShort) => !isShort)}>Toggle</button>
-    <RenderDOM nodes={dom.getNodes()} rootId={dom.getRootId()}></RenderDOM>
+    <RenderDOM vdom={dom.getDOM()}></RenderDOM>
   </>);
 }
 

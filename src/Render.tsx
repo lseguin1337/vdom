@@ -1,17 +1,9 @@
 
 import { Store, useStore } from '@tanstack/react-store';
 import { createContext, createElement, createRef, FC, forwardRef, useContext, useEffect, useMemo } from 'react';
-import { VirtualDOM } from './core-player';
+import { createVDOM, VDOM } from './VirtualDOM';
 
 type RC = FC<{ id: number }>;
-
-type SerializedNode = {
-  csId: number;
-  children?: SerializedNode[];
-  shadowRoot?: SerializedNode;
-  attributes?: { name: string, value: string, namespaceURI?: string }[];
-  [prop: string]: any;
-}
 
 type NodeState = {
   id: number;
@@ -49,11 +41,7 @@ function useNativeNode(node: Node & { [key: string]: any }) {
   return createElement('cs-element-placeholder', { ref });
 }
 
-interface RenderingState {
-  nodes: NodesState,
-}
-
-const RenderingContext = createContext<Store<RenderingState>>(null as unknown as Store<RenderingState>);
+const RenderingContext = createContext<Store<VDOM>>(null as unknown as Store<VDOM>);
 
 const RenderComment: RC = ({ id }) => {
   const commentData = useCharacterData(id);
@@ -202,14 +190,10 @@ const RenderNode: RC = ({ id }) => {
   return (<SpecializedNode id={id} />);
 };
 
-export const RenderDOM: FC<{ nodes: any, rootId: number | null }> = ({ nodes, rootId }) => {
-  const store = useMemo(() => new Store<RenderingState>({ nodes: {} }), []);
-
-  useEffect(() => {
-    store.setState(() => ({ nodes }));
-  }, [store, nodes]);
-
-  const rootNode = useStore(store, ({ nodes }) => rootId && nodes[rootId]);
+export const RenderDOM: FC<{ vdom: VDOM }> = ({ vdom }) => {
+  const store = useMemo(() => new Store<VDOM>(createVDOM()), []);
+  useEffect(() => store.setState(() => vdom), [store, vdom]);
+  const rootNode = useStore(store, ({ nodes, rootId }) => rootId && nodes[rootId]);
 
   return (
     <RenderingContext.Provider value={store}>

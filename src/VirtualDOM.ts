@@ -69,11 +69,11 @@ function serializedToVnode({ csId, children, shadowRoot, contentDocument, attrib
 function *visitNode(node: SerializedNode, parentId?: VNodeId): Generator<VNode> {
   yield serializedToVnode(node, parentId);
   for (const child of node.children || [])
-    yield* visitNode(child, node.parentId);
+    yield* visitNode(child, node.csId);
   if (node.shadowRoot)
-    yield* visitNode(node.shadowRoot, node.parentId);
+    yield* visitNode(node.shadowRoot, node.csId);
   if (node.contentDocument)
-    yield* visitNode(node.contentDocument, node.parentId);
+    yield* visitNode(node.contentDocument, node.csId);
 }
 
 function Event(eventType: RecordingEventType) {
@@ -85,59 +85,95 @@ function Event(eventType: RecordingEventType) {
   };
 }
 
-export class VirtualDOM {
-  private nodes: Nodes = {};
-  private customElements: string[] = [];
-  private stylesheets: StyleSheets = {};
-  private cursor: Cursor | undefined;
-  private touches: Touch[] = [];
-  private rootId: number | undefined;
+export interface VDOM {
+  nodes: Nodes;
+  customElements: string[];
+  stylesheets: StyleSheets;
+  cursor: Cursor | undefined;
+  touches: Touch[];
+  rootId: number | undefined;
+}
 
-  private isDirty = false;
+export function createVDOM(): VDOM {
+  return {
+    nodes: {},
+    customElements: [],
+    stylesheets: {},
+    cursor: undefined,
+    touches: [],
+    rootId: undefined
+  };
+}
+
+export class VirtualDOM {
+  private state: VDOM = createVDOM();
+  private nodeDirty = false;
 
   constructor() {}
 
-  getNodes() {
-    return this.nodes;
+  private get nodes() {
+    return this.state.nodes;
+  }
+  private set nodes(nodes: Nodes) {
+    this.state = { ...this.state, nodes };
+  }
+
+  private get stylesheets() {
+    return this.state.stylesheets;
+  }
+  private set stylesheets(stylesheets: StyleSheets) {
+    this.state = { ...this.state, stylesheets };
+  }
+
+  private get customElements() {
+    return this.state.customElements;
+  }
+  private set customElements(customElements: string[]) {
+    this.state = { ...this.state, customElements };
+  }
+
+  private get cursor() {
+    return this.state.cursor;
+  }
+  private set cursor(cursor: Cursor | undefined) {
+    this.state = { ...this.state, cursor };
+  }
+
+  private get touches() {
+    return this.state.touches;
+  }
+  private set touches(touches: Touch[]) {
+    this.state = { ...this.state, touches };
+  }
+
+  private get rootId() {
+    return this.state.rootId;
+  }
+  private set rootId(rootId: VNodeId | undefined) {
+    this.state = { ...this.state, rootId };
+  }
+
+  getDOM() {
+    return this.state;
   }
 
   getNode(id: VNodeId) {
-    this.isDirty = true;
-    this.nodes[id] = { ...this.nodes[id] };
-    return this.nodes[id];
+    // when accessing to a node we make sure the nodes will be recreated
+    this.nodeDirty = true;
+    return (this.nodes[id] = { ...this.nodes[id] });
   }
 
   getStylesheet(id: number) {
     return this.stylesheets[id];
   }
 
-  getCustomElements() {
-    return this.customElements;
-  }
-
-  getRootId() {
-    return this.rootId || null;
-  }
-
-  getCursor() {
-    return this.cursor;
-  }
-
-  getTouches() {
-    return this.touches;
-  }
-
   clear() {
-    this.nodes = {};
-    this.customElements = [];
-    this.stylesheets = {};
-    this.cursor = undefined;
-    this.touches = [];
-    this.rootId = undefined;
+    this.state = createVDOM();
   }
 
   @Event(RecordingEventType.INITIAL_DOM)
   initialDOM(serializedNode: SerializedNode) {
+    // TODO: not sure if I have to call the clear method here
     this.nodes = {}; // remove all existing nodes
     this.registerNodes(serializedNode);
     this.rootId = serializedNode.csId;
@@ -145,24 +181,16 @@ export class VirtualDOM {
 
   @Event(RecordingEventType.MUTATION_INSERT)
   mutationInsert(parentId: number, nextSibling: number, serializedNode: SerializedNode) {
-    this.registerNodes(serializedNode, parentId);
-    const parent = this.getNode(parentId);
-    const siblings = parent.children || [];
-    const index = siblings.indexOf(nextSibling);
-    if (index > -1) {
-      const prevSiblings = siblings!.slice(0, index);
-      const nextSiblings = siblings!.slice(index);
-      parent.children = [...prevSiblings, serializedNode.csId, ...nextSiblings];
-    } else {
-      parent.children = [...siblings, serializedNode.csId];
-    }
+    this.registerNodes(serializedNode);
+    const node = this.getNode(serializedNode.csId);
+    this.insertBefore(node, parentId, nextSibling);
   }
 
   @Event(RecordingEventType.MUTATION_MOVE)
   mutationMove(nodeId: number, nextSibling: number, parentId: number) {
     const node = this.getNode(nodeId);
-    this.detachNode(node);
-    
+    console.log('mutationMove', node.parentId, parentId, nextSibling);
+    this.insertBefore(node, parentId, nextSibling);
   }
 
   @Event(RecordingEventType.MUTATION_REMOVE)
@@ -172,11 +200,28 @@ export class VirtualDOM {
     // TODO: remove the node from the store
   }
 
+  private insertBefore(node: VNode, parentId: VNodeId, nextSibling?: VNodeId) {
+    if (node.parentId)
+      this.detachNode(node);
+    node.parentId = parentId;
+    const parent = this.getNode(parentId);
+    const siblings = parent.children || [];
+    const index = nextSibling ? siblings.indexOf(nextSibling) : -1;
+    if (index > -1) {
+      const prevSiblings = siblings!.slice(0, index);
+      const nextSiblings = siblings!.slice(index);
+      parent.children = [...prevSiblings, node.id, ...nextSiblings];
+    } else {
+      parent.children = [...siblings, node.id];
+    }
+  }
+
   private detachNode(node: VNode) {
     const parentId = node.parentId;
     if (parentId) {
       const parent = this.getNode(parentId);
       parent.children = parent.children?.filter(c => c !== node.id);
+      node.parentId = undefined;
     }
   }
 
@@ -265,22 +310,24 @@ export class VirtualDOM {
     this.customElements = [...this.customElements, localName];
   }
 
+  // TODO: handle all other events
+
   apply(events: RecordingEvent[]) {
-    this.isDirty = false;
     for (const event of events) {
       const method = getMethodName(event.type);
       if (method)
         (this[method] as any)(...event.args);
     }
-    if (this.isDirty)
-      this.nodes = { ...this.nodes };
+    if (this.nodeDirty) {
+      this.nodes = Object.assign({}, this.nodes);
+      this.nodeDirty = false;
+    }
   }
 
   private registerNodes(root: SerializedNode, parentId?: VNodeId) {
     for (const node of visitNode(root, parentId))
       this.nodes[node.id] = node;
   }
-  // ... handle all other event 
 }
 
 function getMethodName(eventType: RecordingEventType): keyof VirtualDOM | undefined {
