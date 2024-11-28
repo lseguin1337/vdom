@@ -32,6 +32,7 @@ interface VNode {
   data?: string;
   parentId?: VNodeId;
   shadowRoot?: VNodeId;
+  contentDocument?: VNodeId;
   attributes?: { [name: string]: string }; // TODO: do something to handle namespace
   children?: VNodeId[];
   adoptedStylesheets?: number[];
@@ -197,7 +198,8 @@ export class PlaybackEngine {
   mutationRemove(nodeId: number) {
     const node = this.getNode(nodeId);
     this.detachNode(node);
-    // TODO: remove the node from the store
+    for (const curr of this.visitNode(node))
+      delete this.state.nodes[curr.id];
   }
 
   @Play(RecordingEventType.MUTATION_CHARACTER_DATA)
@@ -310,6 +312,16 @@ export class PlaybackEngine {
       this.nodeDirty = false;
     }
     return this;
+  }
+
+  private *visitNode(node: VNode): Generator<VNode> {
+    yield node;
+    for (const childId of node.children || [])
+      yield* this.visitNode(this.nodes[childId]);
+    if (node.shadowRoot)
+      yield* this.visitNode(this.nodes[node.shadowRoot]);
+    if (node.contentDocument)
+      yield* this.visitNode(this.nodes[node.contentDocument]);
   }
 
   private insertBefore(node: VNode, parentId: VNodeId, nextSibling?: VNodeId) {
