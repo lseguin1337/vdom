@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { RenderDOM } from './Render'
+import { RenderDOM } from './RenderDOM'
 import { PlaybackEngine } from './PlayerEngine';
 import { recordingEvents } from './events';
 
@@ -18,7 +18,7 @@ function App() {
     <h1>
       render at index:
       <select value={renderAt} onChange={(event) => setRenderAt(+event.target.value)}>
-        {recordingEvents.map((_, index) => (<option value={index}>{index}</option>))}
+        {recordingEvents.map((_, index) => (<option key={index} value={index}>{index}</option>))}
       </select>
     </h1>
     <RenderDOM vdom={virtualDOM}></RenderDOM>

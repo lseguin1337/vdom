@@ -192,8 +192,9 @@ const RenderNode: RC = ({ id }) => {
 
 export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
   const store = useMemo(() => new Store<VirtualDOM>(createVirtualDOM()), []);
-  useEffect(() => store.setState(() => vdom), [store, vdom]);
   const rootNode = useStore(store, ({ nodes, rootId }) => rootId && nodes[rootId]);
+
+  useEffect(() => store.setState(() => vdom), [store, vdom]);
 
   return (
     <RenderingContext.Provider value={store}>
