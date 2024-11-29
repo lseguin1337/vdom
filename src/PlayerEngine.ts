@@ -67,7 +67,7 @@ interface Size {
 
 export interface VirtualDOM {
   document: VNode | undefined;
-  customElements: string[];
+  customElements: Set<string>;
   cursor: Cursor | undefined;
   touches: Touch[];
   viewport: Size | undefined;
@@ -77,7 +77,7 @@ export interface VirtualDOM {
 export function createVirtualDOM(): VirtualDOM {
   return {
     document: undefined,
-    customElements: [],
+    customElements: new Set(),
     viewport: undefined,
     screen: undefined,
     cursor: undefined,
@@ -128,6 +128,8 @@ export class PlaybackEngine {
   }
 
   clear() {
+    this.nodes = {};
+    this.dirtyNodes.clear();
     this.state = createVirtualDOM();
     return this;
   }
@@ -136,8 +138,7 @@ export class PlaybackEngine {
   initialDOM(serializedNode: SerializedNode) {
     // TODO: not sure if I have to call the clear method here
     this.nodes = {};
-    this.state = { ...this.state, document: this.toVNode(serializedNode) };
-    console.log(this.state.document);
+    this.state.document = this.toVNode(serializedNode);
   }
 
   @Play(RecordingEventType.MUTATION_INSERT)
@@ -253,7 +254,7 @@ export class PlaybackEngine {
 
   @Play(RecordingEventType.CUSTOM_ELEMENT_REGISTRATION)
   customElementRegistration(localName: string) {
-    this.state.customElements = [...this.state.customElements, localName];
+    this.state.customElements = new Set([...this.state.customElements, localName]);
   }
 
   // TODO: handle all other events
