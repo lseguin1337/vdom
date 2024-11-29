@@ -9,8 +9,8 @@ export interface VAttr {
 }
 
 interface Cursor {
-  x: number;
-  y: number;
+  x?: number;
+  y?: number;
   isPressed?: boolean;
   hover?: VNodeId;
 }
@@ -18,10 +18,6 @@ interface Cursor {
 interface VStyleSheet {
   id: number;
   cssRules: [];
-}
-
-interface StyleSheets {
-  [id: number]: VStyleSheet;
 }
 
 // TODO: split this type in Specialized Type
@@ -36,7 +32,7 @@ export interface VNode {
   contentDocument?: VNode;
   attributes?: { [name: string]: string }; // TODO: do something to handle namespace
   children?: VNode[];
-  adoptedStylesheets?: number[];
+  adoptedStylesheets?: VStyleSheet[];
   value?: string;
   checked?: boolean;
   selectedIndex?: number;
@@ -72,7 +68,6 @@ interface Size {
 export interface VirtualDOM {
   document: VNode | undefined;
   customElements: string[];
-  stylesheets: StyleSheets;
   cursor: Cursor | undefined;
   touches: Touch[];
   viewport: Size | undefined;
@@ -85,7 +80,6 @@ export function createVirtualDOM(): VirtualDOM {
     customElements: [],
     viewport: undefined,
     screen: undefined,
-    stylesheets: {},
     cursor: undefined,
     touches: [],
   };
@@ -97,34 +91,6 @@ export class PlaybackEngine {
   private dirtyNodes = new Set();
 
   constructor() {}
-
-  private get stylesheets() {
-    return this.state.stylesheets;
-  }
-  private set stylesheets(stylesheets: StyleSheets) {
-    this.state = { ...this.state, stylesheets };
-  }
-
-  private get customElements() {
-    return this.state.customElements;
-  }
-  private set customElements(customElements: string[]) {
-    this.state = { ...this.state, customElements };
-  }
-
-  private get cursor() {
-    return this.state.cursor;
-  }
-  private set cursor(cursor: Cursor | undefined) {
-    this.state = { ...this.state, cursor };
-  }
-
-  private get touches() {
-    return this.state.touches;
-  }
-  private set touches(touches: Touch[]) {
-    this.state = { ...this.state, touches };
-  }
 
   private markDirty(id: VNodeId) {
     if (this.dirtyNodes.has(id)) return;
@@ -146,7 +112,7 @@ export class PlaybackEngine {
       }
     }
     else if (id === this.state.document?.id) {
-      this.state = { ...this.state, document: node };
+      this.state.document = node;
     }
   }
 
@@ -159,10 +125,6 @@ export class PlaybackEngine {
     // when accessing to a node we make sure the nodes will be recreated
     this.markDirty(id);
     return this.nodes[id];
-  }
-
-  getStylesheet(id: number) {
-    return this.stylesheets[id];
   }
 
   clear() {
@@ -249,58 +211,64 @@ export class PlaybackEngine {
 
   @Play(RecordingEventType.MOUSE_DOWN)
   mouseDown() {
-    this.cursor = { x: 0, y: 0, ...this.cursor, isPressed: true };
+    this.state.cursor = { ...this.state.cursor, isPressed: true };
   }
 
   @Play(RecordingEventType.MOUSE_UP)
   mouseUp() {
-    this.cursor = { x: 0, y: 0, ...this.cursor, isPressed: false };
+    this.state.cursor = { ...this.state.cursor, isPressed: false };
   }
 
   @Play(RecordingEventType.MOUSE_OVER)
   mouseOver(nodeId: number) {
-    this.cursor = { x: 0, y: 0, ...this.cursor, hover: nodeId };
+    this.state.cursor = { ...this.state.cursor, hover: nodeId };
   }
 
   @Play(RecordingEventType.MOUSE_MOVE)
   mouseMove(x: number, y: number) {
-    this.cursor = { ...this.cursor, x, y };
+    this.state.cursor = { ...this.state.cursor, x, y };
   }
 
   @Play(RecordingEventType.TOUCH_START)
   touchStart(fingerId: number, x: number, y: number) {
-    this.touches = [...this.touches, { id: fingerId, x, y }];
+    this.state.touches = [...this.state.touches, { id: fingerId, x, y }];
   }
 
   @Play(RecordingEventType.TOUCH_MOVE)
   touchMove(fingerId: number, x: number, y: number) {
-    const index = this.touches.findIndex((touch) => touch.id === fingerId);
-    this.touches[index] = {
-      ...this.touches[index],
+    const index = this.state.touches.findIndex((touch) => touch.id === fingerId);
+    this.state.touches[index] = {
+      ...this.state.touches[index],
       x,
       y,
     };
-    this.touches = [...this.touches];
+    this.state.touches = [...this.state.touches];
   }
 
   @Play(RecordingEventType.TOUCH_END)
   @Play(RecordingEventType.TOUCH_CANCEL)
   touchEnd(fingerId: number) {
-    this.touches = this.touches.filter(touch => touch.id !== fingerId);
+    this.state.touches = this.state.touches.filter(touch => touch.id !== fingerId);
   }
 
   @Play(RecordingEventType.CUSTOM_ELEMENT_REGISTRATION)
   customElementRegistration(localName: string) {
-    this.customElements = [...this.customElements, localName];
+    this.state.customElements = [...this.state.customElements, localName];
   }
 
   // TODO: handle all other events
 
   apply(events: RecordingEvent[]) {
+    let isDirtyState = false;
     for (const event of events) {
       const method = getMethodName(event.type);
-      if (method)
+      if (method) {
         (this[method] as any)(...event.args);
+        isDirtyState = true;
+      }
+    }
+    if (isDirtyState) {
+      this.state = { ...this.state };
     }
     return this;
   }
