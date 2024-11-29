@@ -25,7 +25,7 @@ function useNativeNode(node: Node & { [key: string]: any }) {
     placeholder!.replaceWith(node);
   }, [node]);
 
-  return createElement('cs-element-placeholder', { ref });
+  return createElement('rendering-placeholder', { ref });
 }
 
 const RenderComment: RC = ({ node }) => {
