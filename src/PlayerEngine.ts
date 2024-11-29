@@ -24,6 +24,7 @@ interface StyleSheets {
   [id: number]: VStyleSheet;
 }
 
+// TODO: split this type in Specialized Type
 export interface VNode {
   id: VNodeId;
   nodeType: string;
