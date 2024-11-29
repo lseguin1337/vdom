@@ -141,6 +141,7 @@ export class PlaybackEngine {
   }
 
   getVirtualDOM() {
+    this.dirtyNodes.clear();
     return this.state;
   }
 
@@ -291,7 +292,6 @@ export class PlaybackEngine {
       if (method)
         (this[method] as any)(...event.args);
     }
-    this.dirtyNodes.clear();
     return this;
   }
 
