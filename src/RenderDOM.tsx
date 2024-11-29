@@ -1,21 +1,8 @@
 
-import { Store, useStore } from '@tanstack/react-store';
-import { createContext, createElement, createRef, FC, useContext, useEffect, useMemo } from 'react';
-import { createVirtualDOM, VirtualDOM } from './PlayerEngine';
+import { createElement, createRef, FC, useEffect, useMemo } from 'react';
+import { VirtualDOM, VNode } from './PlayerEngine';
 
-type RC = FC<{ id: number }>;
-
-type NodeState = {
-  id: number;
-  parentId?: number;
-  children?: number[];
-  shadowRoot?: number;
-  [prop: string]: any;
-}
-
-interface NodesState {
-  [nodeId: number]: NodeState;
-}
+type RC = FC<{ node: VNode }>;
 
 // hacking tool to be able to create a custom node type
 function useNativeNode(node: Node & { [key: string]: any }) {
@@ -41,39 +28,36 @@ function useNativeNode(node: Node & { [key: string]: any }) {
   return createElement('cs-element-placeholder', { ref });
 }
 
-const RenderingContext = createContext<Store<VirtualDOM>>(null as unknown as Store<VirtualDOM>);
-
-const RenderComment: RC = ({ id }) => {
-  const commentData = useCharacterData(id);
+const RenderComment: RC = ({ node }) => {
   const document = useDocument();
   const commentNode = useMemo(() => document.createComment(''), [document]);
 
   useEffect(() => {
-    commentNode.data = commentData;
-  }, [commentData]);
+    commentNode.data = node.data || '';
+  }, [node.data]);
 
   return useNativeNode(commentNode);
 };
 
-const RenderElementIframe: RC = ({ id }) => {
+const RenderElementIframe: RC = ({ node }) => {
   // TODO: RenderIframe
-  return createElement('iframe', { key: id });
+  return createElement('iframe', { key: node.id });
 };
 
-const RenderElementLink: RC = ({ id }) => {
+const RenderElementLink: RC = ({ node }) => {
   //...
   // TODO: RenderLink
-  return createElement('link', { key: id });
+  return createElement('link', { key: node.id });
 };
 
-const RenderElementScript: RC = ({ id }) => {
+const RenderElementScript: RC = ({ node }) => {
   // TODO: RenderLink
-  return createElement('script', { key: id });
+  return createElement('script', { key: node.id });
 };
 
-const RenderElementStyle: RC = ({ id }) => {
+const RenderElementStyle: RC = ({ node }) => {
   // TODO: RenderLink
-  return createElement('style', { key: id });
+  return createElement('style', { key: node.id });
 };
 
 const elements = {
@@ -87,87 +71,50 @@ const RenderElementWithNamespaceURI: RC = () => {
   return (<></>);
 };
 
-function useSelector<T>(selector: (state: NodesState) => T) {
-  const store = useContext(RenderingContext);
-  return useStore(store, (state) => selector(state.nodes));
-}
-
-function useNodeProp<Prop extends keyof NodeState>(id: number, prop: Prop): NodeState[Prop] {
-  return useSelector((nodes) => nodes[id][prop]);
-}
-
-function useNodeAttributes(id: number) {
-  return useNodeProp(id, 'attributes');
-}
-
-function useCharacterData(id: number) {
-  return useNodeProp(id, 'data');
-}
-
-function useChildNodes(id: number) {
-  return useNodeProp(id, 'children') as number[];
-}
-
-function useLocalName(id: number): string {
-  return useNodeProp(id, 'localName');
-}
-
-function useNamespaceURI(id: number): string {
-  return useNodeProp(id, 'namespaceURI');
-}
-
-function useNodeType(id: number) {
-  return useNodeProp(id, 'nodeType');
-}
-
 function useDocument() {
   return document;
 }
 
-const RenderChildNodes: RC = ({ id }) => {
-  const childNodeIds = useChildNodes(id);
-  return (<>{childNodeIds.map(childId => (<RenderNode key={childId} id={childId} />))}</>);
+const RenderChildNodes: RC = ({ node }) => {
+  const children = node.children;
+  return (<>{children?.map(child => (<RenderNode key={child.id} node={child} />))}</>);
 }
 
-const RenderDefaultElement: RC = ({ id }) => {
-  const localName = useLocalName(id);
-  const attributes = useNodeAttributes(id);
-  // const shadowRootRef = useShadowNode(id);
-
+const RenderDefaultElement: RC = ({ node }) => {
+  const { localName, attributes, /* shadowRoot */ } = node as VNode & { localName: string };
   return createElement(
     localName,
-    { key: id, ...attributes },
-    <RenderChildNodes id={id} />,
+    { key: node.id, ...attributes },
+    <RenderChildNodes node={node} />,
   );
 }
 
-const RenderElement: RC = ({ id }) => {
-  const localName = useLocalName(id);
-  const namespaceURI = useNamespaceURI(id);
+const RenderElement: RC = ({ node }) => {
+  const { localName, namespaceURI } = node as VNode & { localName: string, namespaceURI: string };
 
   if (namespaceURI !== 'http://www.w3.org/1999/xhtml') {
-    return (<RenderElementWithNamespaceURI id={id} />);
+    return (<RenderElementWithNamespaceURI node={node} />);
   }
   if (localName in elements) {
     const SpecializedElement = elements[localName as keyof typeof elements];
-    return (<SpecializedElement id={id} />);
+    return (<SpecializedElement node={node} />);
   }
-  return (<RenderDefaultElement id={id} />);
+  return (<RenderDefaultElement node={node} />);
 };
 
-const RenderDocument: RC = ({ id }) => {
-  return <RenderChildNodes id={id} />;
+const RenderDocument: RC = ({ node }) => {
+  return <RenderChildNodes node={node} />;
 };
 
-const RenderDocType: RC = ({ id }) => {
+const RenderDocType: RC = ({ node }) => {
   const document = useDocument();
-  const { qualifiedName, publicId, systemId } = useSelector((nodes) => nodes[id]);
+  const { qualifiedName, publicId, systemId } = node as VNode & { qualifiedName: string, publicId: string, systemId: string };
   const docType = useMemo(() => document.implementation.createDocumentType(qualifiedName, publicId, systemId), [document, qualifiedName, publicId, systemId]);
   return useNativeNode(docType);
 };
 
-const RenderText: RC = ({ id }) => {
-  return useCharacterData(id);
+const RenderText: RC = ({ node }) => {
+  return node.data;
 };
 
 const RenderCDATASection: RC = () => {
@@ -184,21 +131,12 @@ const nodes = {
   [Node.CDATA_SECTION_NODE]: RenderCDATASection,
 };
 
-const RenderNode: RC = ({ id }) => {
-  const nodeType = useNodeType(id) as keyof typeof nodes;
-  const SpecializedNode = nodes[nodeType];
-  return (<SpecializedNode id={id} />);
+const RenderNode: RC = ({ node }) => {
+  const SpecializedNode = nodes[node.nodeType as unknown as keyof typeof nodes];
+  return (<SpecializedNode node={node} />);
 };
 
 export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
-  const store = useMemo(() => new Store<VirtualDOM>(createVirtualDOM()), []);
-  const rootNode = useStore(store, ({ nodes, rootId }) => rootId && nodes[rootId]);
-
-  useEffect(() => store.setState(() => vdom), [store, vdom]);
-
-  return (
-    <RenderingContext.Provider value={store}>
-      {rootNode && <RenderNode id={rootNode.id} />}
-    </RenderingContext.Provider>
-  );
+  if (!vdom.document) return <></>;
+  return <RenderNode node={vdom.document} />
 };

@@ -2,7 +2,7 @@ import { RecordingEvent, RecordingEventType } from "@contentsquare/recording-eve
 
 type VNodeId = number;
 
-interface VAttr {
+export interface VAttr {
   name: string;
   value: string;
   namespaceURI: string;
@@ -24,23 +24,26 @@ interface StyleSheets {
   [id: number]: VStyleSheet;
 }
 
-interface VNode {
+export interface VNode {
   id: VNodeId;
   nodeType: string;
   localName?: string;
   namespaceURI?: string;
   data?: string;
   parentId?: VNodeId;
-  shadowRoot?: VNodeId;
-  contentDocument?: VNodeId;
+  shadowRoot?: VNode;
+  contentDocument?: VNode;
   attributes?: { [name: string]: string }; // TODO: do something to handle namespace
-  children?: VNodeId[];
+  children?: VNode[];
   adoptedStylesheets?: number[];
   value?: string;
   checked?: boolean;
   selectedIndex?: number;
   scrollTop?: number;
   scrollLeft?: number;
+  qualifiedName?: string;
+  publicId?: string;
+  systemId?: string;
 }
 
 interface Touch {
@@ -50,32 +53,6 @@ interface Touch {
 }
 
 type SerializedNode = any;
-
-interface Nodes {
-  [id: VNodeId]: VNode;
-}
-
-function serializedToVnode({ csId, children, shadowRoot, contentDocument, attributes, ...props }: SerializedNode, parentId?: VNodeId): VNode {
-  return {
-    id: csId,
-    parentId,
-    contentDocument: contentDocument?.csId,
-    shadowRoot: shadowRoot?.csId,
-    attributes: attributes?.reduce((acc, { name, value }) => ({ ...acc, [name]: value }), {}),
-    children: children?.map(child => child.csId),
-    ...props,
-  };
-}
-
-function *visitNode(node: SerializedNode, parentId?: VNodeId): Generator<VNode> {
-  yield serializedToVnode(node, parentId);
-  for (const child of node.children || [])
-    yield* visitNode(child, node.csId);
-  if (node.shadowRoot)
-    yield* visitNode(node.shadowRoot, node.csId);
-  if (node.contentDocument)
-    yield* visitNode(node.contentDocument, node.csId);
-}
 
 function Play(eventType: RecordingEventType) {
   return (target: any, method: any) => {
@@ -87,37 +64,29 @@ function Play(eventType: RecordingEventType) {
 }
 
 export interface VirtualDOM {
-  nodes: Nodes;
+  document: VNode | undefined;
   customElements: string[];
   stylesheets: StyleSheets;
   cursor: Cursor | undefined;
   touches: Touch[];
-  rootId: number | undefined;
 }
 
 export function createVirtualDOM(): VirtualDOM {
   return {
-    nodes: {},
+    document: undefined,
     customElements: [],
     stylesheets: {},
     cursor: undefined,
     touches: [],
-    rootId: undefined
   };
 }
 
 export class PlaybackEngine {
+  private nodes: { [id: VNodeId]: VNode } = {};
   private state: VirtualDOM = createVirtualDOM();
-  private nodeDirty = false;
+  private dirtyNodes = new Set();
 
   constructor() {}
-
-  private get nodes() {
-    return this.state.nodes;
-  }
-  private set nodes(nodes: Nodes) {
-    this.state = { ...this.state, nodes };
-  }
 
   private get stylesheets() {
     return this.state.stylesheets;
@@ -147,11 +116,20 @@ export class PlaybackEngine {
     this.state = { ...this.state, touches };
   }
 
-  private get rootId() {
-    return this.state.rootId;
-  }
-  private set rootId(rootId: VNodeId | undefined) {
-    this.state = { ...this.state, rootId };
+  private markDirty(id: VNodeId) {
+    if (this.dirtyNodes.has(id)) return;
+    const node = this.nodes[id] = { ...this.nodes[id] };
+    this.dirtyNodes.add(id);
+    if (node.parentId) {
+      const parent = this.getNode(node.parentId);
+      const siblings = parent.children!;
+      const index = siblings.findIndex((child) => child.id === node.id);
+      siblings[index] = node;
+      parent.children = [...siblings];
+    }
+    else if (id === this.state.document?.id) {
+      this.state = { ...this.state, document: node };
+    }
   }
 
   getVirtualDOM() {
@@ -160,8 +138,8 @@ export class PlaybackEngine {
 
   getNode(id: VNodeId) {
     // when accessing to a node we make sure the nodes will be recreated
-    this.nodeDirty = true;
-    return (this.nodes[id] = { ...this.nodes[id] });
+    this.markDirty(id);
+    return this.nodes[id];
   }
 
   getStylesheet(id: number) {
@@ -176,15 +154,14 @@ export class PlaybackEngine {
   @Play(RecordingEventType.INITIAL_DOM)
   initialDOM(serializedNode: SerializedNode) {
     // TODO: not sure if I have to call the clear method here
-    this.nodes = {}; // remove all existing nodes
-    this.registerNodes(serializedNode);
-    this.rootId = serializedNode.csId;
+    this.nodes = {};
+    this.state = { ...this.state, document: this.toVNode(serializedNode) };
+    console.log(this.state.document);
   }
 
   @Play(RecordingEventType.MUTATION_INSERT)
   mutationInsert(parentId: number, nextSibling: number, serializedNode: SerializedNode) {
-    this.registerNodes(serializedNode);
-    const node = this.getNode(serializedNode.csId);
+    const node = this.toVNode(serializedNode);
     this.insertBefore(node, parentId, nextSibling);
   }
 
@@ -199,7 +176,7 @@ export class PlaybackEngine {
     const node = this.getNode(nodeId);
     this.detachNode(node);
     for (const curr of this.visitNode(node))
-      delete this.state.nodes[curr.id];
+      delete this.nodes[curr.id];
   }
 
   @Play(RecordingEventType.MUTATION_CHARACTER_DATA)
@@ -223,8 +200,7 @@ export class PlaybackEngine {
   @Play(RecordingEventType.ATTACH_SHADOW)
   attachShadow(nodeId: number, serializedShadow: SerializedNode) {
     const node = this.getNode(nodeId);
-    this.registerNodes(serializedShadow, nodeId);
-    node.shadowRoot = serializedShadow.csId;
+    node.shadowRoot = this.toVNode(serializedShadow, nodeId);
   }
 
   @Play(RecordingEventType.INPUT_TEXT)
@@ -307,21 +283,18 @@ export class PlaybackEngine {
       if (method)
         (this[method] as any)(...event.args);
     }
-    if (this.nodeDirty) {
-      this.nodes = Object.assign({}, this.nodes);
-      this.nodeDirty = false;
-    }
+    this.dirtyNodes.clear();
     return this;
   }
 
   private *visitNode(node: VNode): Generator<VNode> {
     yield node;
-    for (const childId of node.children || [])
-      yield* this.visitNode(this.nodes[childId]);
+    for (const child of node.children || [])
+      yield* this.visitNode(child);
     if (node.shadowRoot)
-      yield* this.visitNode(this.nodes[node.shadowRoot]);
+      yield* this.visitNode(node.shadowRoot);
     if (node.contentDocument)
-      yield* this.visitNode(this.nodes[node.contentDocument]);
+      yield* this.visitNode(node.contentDocument);
   }
 
   private insertBefore(node: VNode, parentId: VNodeId, nextSibling?: VNodeId) {
@@ -330,13 +303,13 @@ export class PlaybackEngine {
     node.parentId = parentId;
     const parent = this.getNode(parentId);
     const siblings = parent.children || [];
-    const index = nextSibling ? siblings.indexOf(nextSibling) : -1;
+    const index = nextSibling ? siblings.findIndex(sibling => sibling.id === nextSibling) : -1;
     if (index > -1) {
       const prevSiblings = siblings!.slice(0, index);
       const nextSiblings = siblings!.slice(index);
-      parent.children = [...prevSiblings, node.id, ...nextSiblings];
+      parent.children = [...prevSiblings, node, ...nextSiblings];
     } else {
-      parent.children = [...siblings, node.id];
+      parent.children = [...siblings, node];
     }
   }
 
@@ -344,17 +317,26 @@ export class PlaybackEngine {
     const parentId = node.parentId;
     if (parentId) {
       const parent = this.getNode(parentId);
-      parent.children = parent.children?.filter(c => c !== node.id);
+      parent.children = parent.children?.filter(sibling => sibling.id !== node.id);
       node.parentId = undefined;
     }
   }
 
-  private registerNodes(root: SerializedNode, parentId?: VNodeId) {
-    for (const node of visitNode(root, parentId))
-      this.nodes[node.id] = node;
+  private toVNode({ csId, children, shadowRoot, contentDocument, attributes, ...props }: SerializedNode, parentId?: VNodeId): VNode {
+    const node: VNode = {
+      id: csId,
+      children: children?.map((child: SerializedNode) => this.toVNode(child, csId)),
+      shadowRoot: shadowRoot && this.toVNode(shadowRoot, csId),
+      contentDocument: contentDocument && this.toVNode(contentDocument, csId),
+      attributes: attributes?.reduce((acc: { [name: string]: string }, { name, value }: { name: string, value: string }) => ({ ...acc, [name]: value }), {}),
+      parentId,
+      ...props,
+    };
+    this.nodes[node.id] = node;
+    return node;
   }
 }
 
-function getMethodName(eventType: RecordingEventType): keyof VirtualDOM | undefined {
+function getMethodName(eventType: RecordingEventType): keyof PlaybackEngine | undefined {
   return (PlaybackEngine as any).__events[eventType];
 }
