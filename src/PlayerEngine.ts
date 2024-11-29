@@ -64,18 +64,27 @@ function Play(eventType: RecordingEventType) {
   };
 }
 
+interface Size {
+  width: number;
+  height: number;
+}
+
 export interface VirtualDOM {
   document: VNode | undefined;
   customElements: string[];
   stylesheets: StyleSheets;
   cursor: Cursor | undefined;
   touches: Touch[];
+  viewport: Size | undefined;
+  screen: Size | undefined;
 }
 
 export function createVirtualDOM(): VirtualDOM {
   return {
     document: undefined,
     customElements: [],
+    viewport: undefined,
+    screen: undefined,
     stylesheets: {},
     cursor: undefined,
     touches: [],

@@ -3,15 +3,24 @@ import { RenderDOM } from './RenderDOM'
 import { PlaybackEngine } from './PlayerEngine';
 import { recordingEvents } from './events';
 
+let prevRenderAt = 0;
 const playerEngine = new PlaybackEngine();
 
 function App() {
   const [renderAt, setRenderAt] = useState(recordingEvents.length);
   const virtualDOM = useMemo(() => {
-    const events = recordingEvents.slice(0, renderAt);
-    if (events.length === 0)
+    if (prevRenderAt > renderAt) {
       playerEngine.clear();
-    return playerEngine.apply(events).getVirtualDOM();
+      prevRenderAt = 0;
+      console.log('cleared vdom state');
+    }
+    const selectedEvents = recordingEvents.slice(prevRenderAt, renderAt);
+    if (selectedEvents.length) {
+      console.log('applied events:', selectedEvents);
+      playerEngine.apply(selectedEvents);
+    }
+    prevRenderAt = renderAt;
+    return playerEngine.getVirtualDOM();
   }, [renderAt]);
 
   return (<>
