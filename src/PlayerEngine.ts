@@ -121,11 +121,19 @@ export class PlaybackEngine {
     const node = this.nodes[id] = { ...this.nodes[id] };
     this.dirtyNodes.add(id);
     if (node.parentId) {
+      // make the parent dirty has well
       const parent = this.getNode(node.parentId);
+      // update the children ref
       const siblings = parent.children!;
       const index = siblings.findIndex((child) => child.id === node.id);
-      siblings[index] = node;
-      parent.children = [...siblings];
+      if (index !== -1) {
+        siblings[index] = node;
+        parent.children = [...siblings];
+      } else if (parent.contentDocument?.id === node.id) {
+        parent.contentDocument = node;
+      } else if (parent.shadowRoot?.id === node.id) {
+        parent.shadowRoot = node;
+      }
     }
     else if (id === this.state.document?.id) {
       this.state = { ...this.state, document: node };
