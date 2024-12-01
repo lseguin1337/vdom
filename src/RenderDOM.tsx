@@ -36,16 +36,15 @@ const elements = {
   script: RenderElementScript,
 };
 
-const RenderChildNodes: RC = ({ node }) => {
-  const children = node.children;
-  return (<>{children?.map(child => (<RenderNode key={child.id} node={child} />))}</>);
-}
+const RenderChildNodes: FC<{ nodes?: VNode[] }> = ({ nodes }) => {
+  return (<>{nodes?.map(child => (<RenderNode key={child.id} node={child} />))}</>);
+};
 
 const RenderShadowRoot: RC = ({ node }) => {
   return createElement('#shadowRoot', {
     mode: 'open',
     adoptedStylesheets: node.adoptedStylesheets,
-  }, <RenderChildNodes node={node} />);
+  }, <RenderChildNodes nodes={node.children} />);
 };
 
 const RenderDefaultElement: RC = ({ node }) => {
@@ -59,7 +58,7 @@ const RenderDefaultElement: RC = ({ node }) => {
     },
     <>
       {shadowRoot && <RenderShadowRoot node={shadowRoot} />}
-      <RenderChildNodes node={node} />
+      <RenderChildNodes nodes={node.children} />
     </>
   );
 }
@@ -74,7 +73,7 @@ const RenderElement: RC = ({ node }) => {
 };
 
 const RenderDocument: RC = ({ node }) => {
-  return <RenderChildNodes node={node} />;
+  return <RenderChildNodes nodes={node.children} />;
 };
 
 const RenderDocType: RC = ({ node }) => {

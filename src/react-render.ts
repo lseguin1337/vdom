@@ -40,6 +40,10 @@ function createElementNS(namespaceURI, localName) {
   }
 }
 
+function removeAttributeNS(element, attr) {
+  element.removeAttributeNS(attr.namespaceURI, attr.name);
+}
+
 function setAttribute(element, attr) {
   try {
     element.setAttributeNS(
@@ -71,7 +75,7 @@ function setAttribute(element, attr) {
 
 function normalizeAttributes(attributes) {
   const attrs: Record<string, any> = {};
-  if (!attributes) return attrs;
+  if (!attributes || !(attributes instanceof Array)) return attrs;
   for (const attr of attributes)
     attrs[`${attr.namespaceURI}/${attr.name}`] = attr;
   return attrs;
@@ -84,7 +88,8 @@ const ReactReconcilerInst = ReactReconciler({
   },
   prepareForCommit: () => {},
   resetAfterCommit: () => {},
-  getChildHostContext: () => {
+  getChildHostContext: (...args) => {
+    console.log('getChildHostContext', args);
     return childHostContext;
   },
   shouldSetTextContent: (type, props) => {
@@ -109,6 +114,10 @@ const ReactReconcilerInst = ReactReconciler({
     // TODO: create element using namespaceURI
     const domElement = createElementNS(namespaceURI, type);
 
+    if ('value' in newProps) {
+      console.log(domElement);
+    }
+
     // React props
     for (const propName of Object.keys(newProps)) {
       const propValue = newProps[propName];
@@ -116,17 +125,19 @@ const ReactReconcilerInst = ReactReconciler({
         domElement.addEventListener(propName.slice(2).toLowerCase(), propValue);
       } else if (propName === 'className') {
         domElement.setAttribute('class', propValue);
-      } else if (propName === 'value' || propName === 'selectedIndex') {
-        domElement[propName] = propValue;
+      } else if (propName === 'value') {
+        domElement.value = propValue;
       } else {
         domElement.setAttribute(propName, propValue);
       }
     }
 
-    if (attributes) {
+    if (attributes && attributes instanceof Array) {
       // Native attributes
       for (const attr of attributes)
         setAttribute(domElement, attr);
+    } else if (attributes) {
+      console.log(domElement, attributes);
     }
 
     return domElement;
@@ -137,7 +148,12 @@ const ReactReconcilerInst = ReactReconciler({
   appendInitialChild: appendChild,
   appendChild: appendChild,
   appendChildToContainer: appendChild,
-  finalizeInitialChildren: (domElement, type, props) => {},
+  finalizeInitialChildren: (domElement, type, props) => {
+    if (type === 'select' && props.value) {
+      domElement.value = props.value;
+    }
+    return false;
+  },
   supportsMutation: true,
   prepareUpdate(domElement, oldProps, newProps) {
     return true;
@@ -158,9 +174,22 @@ const ReactReconcilerInst = ReactReconciler({
         return;
     }
 
-    const oldNativeAttributes = normalizeAttributes(oldAttributes);
-    const newNativeAttributes = normalizeAttributes(newAttributes);
+    if (oldAttributes !== newAttributes) {
+      const oldNativeAttributes = normalizeAttributes(oldAttributes);
+      const newNativeAttributes = normalizeAttributes(newAttributes);
+      
+      Object.keys(oldNativeAttributes).forEach(propName => {
+        if (!newNativeAttributes[propName]) {
+          const attr = oldNativeAttributes[propName];
+          removeAttributeNS(domElement, attr);
+        }
+      });
 
+      Object.keys(newNativeAttributes).forEach(propName => {
+        setAttribute(domElement, newNativeAttributes[propName]);
+      });
+    }
+  
     Object.keys(oldProps).forEach(propName => {
       if (!newProps[propName]) {
         domElement.removeAttribute(propName);
@@ -169,7 +198,11 @@ const ReactReconcilerInst = ReactReconciler({
 
     Object.keys(newProps).forEach(propName => {
       const propValue = newProps[propName];
-      domElement.setAttribute(propName, propValue);
+      if (propName === 'value' && 'value' in domElement) {
+        domElement.value = propValue;
+      } else {
+        domElement.setAttribute(propName, propValue);
+      }
     });
   },
   commitTextUpdate(textInstance, oldText, newText) {

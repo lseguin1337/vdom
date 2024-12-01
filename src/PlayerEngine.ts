@@ -168,14 +168,18 @@ export class PlaybackEngine {
   }
 
   @Play(RecordingEventType.MUTATION_ATTRIBUTE)
-  mutationAttribute(nodeId: number, _attrNamespace: string, attrName: string, attrValue: string) {
+  mutationAttribute(nodeId: number, attrNamespace: string, attrName: string, attrValue: string) {
     // TODO: handle namespaceURI
     const node = this.getNode(nodeId);
+    const attributes = node.attributes || [];
+    const index = attributes.findIndex((attr) => !(attr.namespaceURI === attrNamespace && attr.name === attrName));
     if (attrValue === null || attrValue === undefined) {
-      node.attributes = { ...node.attributes };
-      delete node.attributes[attrName];
+      node.attributes = node.attributes?.filter((_attr, i) => i !== index);
+    } else if (index === -1) {
+      node.attributes = [...node.attributes || [], { namespaceURI: attrNamespace, name: attrName, value: attrValue }];
     } else {
-      node.attributes = { ...node.attributes, [attrName]: attrValue };
+      attributes[index] = { namespaceURI: attrNamespace, name: attrName, value: attrValue };
+      node.attributes = [...attributes];
     }
   }
 
