@@ -44,7 +44,7 @@ function removeAttributeNS(element, attr) {
   element.removeAttributeNS(attr.namespaceURI, attr.name);
 }
 
-function setAttribute(element, attr) {
+function setAttributeNS(element, attr) {
   try {
     element.setAttributeNS(
       attr.namespaceURI,
@@ -135,7 +135,7 @@ const ReactReconcilerInst = ReactReconciler({
     if (attributes && attributes instanceof Array) {
       // Native attributes
       for (const attr of attributes)
-        setAttribute(domElement, attr);
+        setAttributeNS(domElement, attr);
     } else if (attributes) {
       console.log(domElement, attributes);
     }
@@ -159,7 +159,7 @@ const ReactReconcilerInst = ReactReconciler({
     return true;
   },
   // instance, type, prevProps, nextProps, internalHandle
-  commitUpdate(domElement, updatePayload, type, { attributes: oldAttributes, ...oldProps }, { attributes: newAttributes, children, ...newProps }) {
+  commitUpdate(domElement, updatePayload, type, { namespaceURI: oldNamespaceURI, attributes: oldAttributes, ...oldProps }, { namespaceURI: newNamespaceURI, attributes: newAttributes, children, ...newProps }) {
     switch (type) {
       case '#comment':
         domElement.data = newProps.data || '';
@@ -186,7 +186,7 @@ const ReactReconcilerInst = ReactReconciler({
       });
 
       Object.keys(newNativeAttributes).forEach(propName => {
-        setAttribute(domElement, newNativeAttributes[propName]);
+        setAttributeNS(domElement, newNativeAttributes[propName]);
       });
     }
   
