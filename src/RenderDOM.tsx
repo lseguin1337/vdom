@@ -110,8 +110,7 @@ export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
     const iframe =  event.target;
     iframe._root?.unmount();
     const doc = iframe.contentDocument;
-    iframe._root = createRoot(doc);
-    setRoot(iframe._root);
+    setRoot((iframe._root = createRoot(doc)));
   }, []);
 
   useEffect(() => {
