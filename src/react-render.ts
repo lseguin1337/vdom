@@ -24,7 +24,7 @@ function isXhtmlNamespace(namespaceURI: string | null) {
   return namespaceURI === XHTML_NAMESPACE;
 }
 
-function createElementNS(namespaceURI, localName) {
+function createElementNS(document, namespaceURI, localName) {
   namespaceURI = namespaceURI === undefined ? XHTML_NAMESPACE : namespaceURI;
   try {
     return isXhtmlNamespace(namespaceURI) && localName.indexOf(":") > -1
@@ -99,6 +99,8 @@ const ReactReconcilerInst = ReactReconciler({
    This is where react-reconciler wants to create an instance of UI element in terms of the target. Since our target here is the DOM, we will create document.createElement and type is the argument that contains the type string like div or img or h1 etc. The initial values of domElement attributes can be set in this function from the newProps argument
    */
   createInstance: (type, { attributes, namespaceURI, children, ...newProps }, rootContainerInstance, _currentHostContext, workInProgress) => {
+    const document = rootContainerInstance.ownerDocument || rootContainerInstance;
+    
     switch (type) {
       case '#comment':
         return document.createComment(newProps?.data || '');
@@ -111,29 +113,29 @@ const ReactReconcilerInst = ReactReconciler({
     }
 
     // TODO: create element using namespaceURI
-    const domElement = createElementNS(namespaceURI, type);
+    const element = createElementNS(document, namespaceURI, type);
 
     // React props
     for (const propName of Object.keys(newProps)) {
       const propValue = newProps[propName];
       if (/^on/.test(propName) && typeof propValue === 'function') {
-        domElement.addEventListener(propName.slice(2).toLowerCase(), propValue);
+        element.addEventListener(propName.slice(2).toLowerCase(), propValue);
       } else if (propName === 'className') {
-        domElement.setAttribute('class', propValue);
+        element.setAttribute('class', propValue);
       } else if (propName === 'value') {
-        domElement.value = propValue;
+        element.value = propValue;
       } else {
-        domElement.setAttribute(propName, propValue);
+        element.setAttribute(propName, propValue);
       }
     }
 
+    // Native attributes
     if (attributes && attributes instanceof Array) {
-      // Native attributes
       for (const attr of attributes)
-        setAttributeNS(domElement, attr);
+        setAttributeNS(element, attr);
     }
 
-    return domElement;
+    return element;
   },
   createTextInstance: text => {
     return document.createTextNode(text);
@@ -142,9 +144,6 @@ const ReactReconcilerInst = ReactReconciler({
   appendChild: appendChild,
   appendChildToContainer: appendChild,
   finalizeInitialChildren: (domElement, type, props) => {
-    if (type === 'select' && props.value) {
-      domElement.value = props.value;
-    }
     return false;
   },
   supportsMutation: true,
