@@ -55,7 +55,8 @@ function shadowRoot(...children: any[]) {
 
 const yoloComment = comment(' yolo ');
 const firstText = text('Hello world');
-const divContainer = el('div', [attr('data-href', 'tata')], [firstText, text('yolo'), yoloComment]);
+const style = el('style', [], [text('section { background-color: #fff; }')])
+const divContainer = el('div', [attr('data-href', 'tata')], [style, firstText, text('yolo'), yoloComment]);
 const section = el('section', [attr('data-href-t', 'tata-t')], [divContainer]);
 
 const nestedEl = el('div', [], [text('nested div')]);

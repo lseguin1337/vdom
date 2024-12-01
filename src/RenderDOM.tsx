@@ -1,33 +1,52 @@
 
-import { createElement, FC, useCallback, useEffect, useState } from 'react';
+import { createElement, FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { VirtualDOM, VNode } from './PlayerEngine';
 import { createRoot } from './react-render';
 
 type RC = FC<{ node: VNode }>;
+
+function useChildDocRenderer(node?: VNode) {
+  const [root, setRoot] = useState<ReturnType<typeof createRoot> | null>(null);
+
+  useEffect(() => {
+    root?.render(node ? <RenderNode node={node} /> : null);
+  }, [root, node]);
+
+  const destroy = useCallback(() => root?.unmount(), [root]);
+  useEffect(() => destroy, [destroy]);
+
+  return useCallback((event: any) => {
+    const iframe =  event.target as HTMLIFrameElement & { _root?: ReturnType<typeof createRoot> };
+    iframe._root?.unmount();
+    const doc = iframe.contentDocument;
+    setRoot((iframe._root = createRoot(doc)));
+  }, []);
+}
 
 const RenderComment: RC = ({ node }) => {
   return createElement('#comment', { data: node.data });
 };
 
 const RenderElementIframe: RC = ({ node }) => {
-  // TODO: RenderIframe
-  return createElement('iframe', { key: node.id });
+  const onLoad = useChildDocRenderer(node.contentDocument);
+  return (createElement('iframe', { onLoad, namespaceURI: node.namespaceURI, attributes: node.attributes }));
 };
 
 const RenderElementLink: RC = ({ node }) => {
-  //...
-  // TODO: RenderLink
-  return createElement('link', { key: node.id });
+  return createElement('link', { key: node.id, namespaceURI: node.namespaceURI, attributes: node.attributes });
 };
 
 const RenderElementScript: RC = ({ node }) => {
-  // TODO: RenderLink
-  return createElement('script', { key: node.id });
+  return createElement('script', { key: node.id, namespaceURI: node.namespaceURI });
 };
 
 const RenderElementStyle: RC = ({ node }) => {
-  // TODO: RenderLink
-  return createElement('style', { key: node.id });
+  const children = useMemo(() => {
+    // TODO: transform stylesheet here
+    return node.children;
+  }, [node.children]);
+
+  return createElement('style', { key: node.id, namespaceURI: node.namespaceURI, attributes: node.attributes }, <RenderChildNodes nodes={children} />);
 };
 
 const elements = {
@@ -105,20 +124,7 @@ const RenderNode: RC = ({ node }) => {
 };
 
 export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
-  const [root, setRoot] = useState<any>(null);
-  const onLoad = useCallback((event: any) => {
-    const iframe =  event.target;
-    iframe._root?.unmount();
-    const doc = iframe.contentDocument;
-    setRoot((iframe._root = createRoot(doc)));
-  }, []);
-
-  useEffect(() => {
-    root?.render(vdom.document ? <RenderNode node={vdom.document} /> : null);
-  }, [root, vdom.document]);
-
-  const destroy = useCallback(() => root?.unmount(), [root]);
-  useEffect(() => destroy, [destroy]);
-
-  return <iframe style={{ border: 'none', width: '100%', height: '100%' }} onLoad={onLoad} />;
+  const onLoad = useChildDocRenderer(vdom.document);
+  // TODO: render window size
+  return <iframe style={{ border: 'none', width: '100%', height: '100%', ...vdom.viewport }} onLoad={onLoad} />;
 };
