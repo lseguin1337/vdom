@@ -5,7 +5,7 @@ const rootHostContext = {};
 const childHostContext = {};
 
 const dirtyElementBuilder = new DirtyElementBuilder();
-const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+// const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
 function appendChild(parent, child) {
@@ -89,7 +89,6 @@ const ReactReconcilerInst = ReactReconciler({
   prepareForCommit: () => {},
   resetAfterCommit: () => {},
   getChildHostContext: (...args) => {
-    console.log('getChildHostContext', args);
     return childHostContext;
   },
   shouldSetTextContent: (type, props) => {
@@ -114,10 +113,6 @@ const ReactReconcilerInst = ReactReconciler({
     // TODO: create element using namespaceURI
     const domElement = createElementNS(namespaceURI, type);
 
-    if ('value' in newProps) {
-      console.log(domElement);
-    }
-
     // React props
     for (const propName of Object.keys(newProps)) {
       const propValue = newProps[propName];
@@ -136,8 +131,6 @@ const ReactReconcilerInst = ReactReconciler({
       // Native attributes
       for (const attr of attributes)
         setAttributeNS(domElement, attr);
-    } else if (attributes) {
-      console.log(domElement, attributes);
     }
 
     return domElement;
@@ -213,7 +206,6 @@ const ReactReconcilerInst = ReactReconciler({
   },
   removeChildFromContainer(parentInstance, child) {
     child?.remove();
-    //console.log('removeChildFromContainer', args);
   },
   insertBefore(parentInstance, child, beforeChild) {
     parentInstance.insertBefore(child, beforeChild);
@@ -224,7 +216,8 @@ const ReactReconcilerInst = ReactReconciler({
   detachDeletedInstance(domElement) {
   },
   clearContainer(container) {
-    container.innerHTML = '';
+    while (container.firstChild)
+      container.firstChild.remove();
   },
   getPublicInstance(instance) {
     return instance;

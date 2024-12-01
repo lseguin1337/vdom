@@ -1,6 +1,7 @@
 
-import { createElement, FC } from 'react';
+import { createElement, createRef, FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { VirtualDOM, VNode } from './PlayerEngine';
+import { createRoot } from './react-render';
 
 type RC = FC<{ node: VNode }>;
 
@@ -104,6 +105,22 @@ const RenderNode: RC = ({ node }) => {
 };
 
 export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
-  if (!vdom.document) return <></>;
-  return <RenderNode node={vdom.document} />
+  const [root, setRoot] = useState<any>(null);
+  const onLoad = useCallback((event: any) => {
+    const iframe =  event.target;
+    iframe._root?.unmount();
+    const doc = iframe.contentDocument;
+    iframe._root = createRoot(doc);
+    setRoot(iframe._root);
+  }, []);
+
+  useEffect(() => {
+    if (root)
+      root.render(vdom.document ? <RenderNode node={vdom.document} /> : null);
+  }, [root, vdom.document]);
+
+  const destroy = useCallback(() => root?.unmount(), [root]);
+  useEffect(() => destroy, [destroy]);
+
+  return <iframe onLoad={onLoad} />;
 };
