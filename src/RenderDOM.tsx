@@ -115,8 +115,7 @@ export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
   }, []);
 
   useEffect(() => {
-    if (root)
-      root.render(vdom.document ? <RenderNode node={vdom.document} /> : null);
+    root?.render(vdom.document ? <RenderNode node={vdom.document} /> : null);
   }, [root, vdom.document]);
 
   const destroy = useCallback(() => root?.unmount(), [root]);
