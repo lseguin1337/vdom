@@ -120,5 +120,5 @@ export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
   const destroy = useCallback(() => root?.unmount(), [root]);
   useEffect(() => destroy, [destroy]);
 
-  return <iframe onLoad={onLoad} />;
+  return <iframe style={{ border: 'none', width: '100%', height: '100%' }} onLoad={onLoad} />;
 };
