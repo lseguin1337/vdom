@@ -30,7 +30,7 @@ export interface VNode {
   parentId?: VNodeId;
   shadowRoot?: VNode;
   contentDocument?: VNode;
-  attributes?: { [name: string]: string }; // TODO: do something to handle namespace
+  attributes?: VAttr[]; // TODO: do something to handle namespace
   children?: VNode[];
   adoptedStylesheets?: VStyleSheet[];
   value?: string;
@@ -315,7 +315,7 @@ export class PlaybackEngine {
       children: children?.map((child: SerializedNode) => this.toVNode(child, csId)),
       shadowRoot: shadowRoot && this.toVNode(shadowRoot, csId),
       contentDocument: contentDocument && this.toVNode(contentDocument, csId),
-      attributes: attributes?.reduce((acc: { [name: string]: string }, { name, value }: { name: string, value: string }) => ({ ...acc, [name]: value }), {}),
+      attributes,
       parentId,
       ...props,
     };
