@@ -63,7 +63,7 @@ const RenderChildNodes: FC<{ nodes?: VNode[] }> = ({ nodes }) => {
 const RenderShadowRoot: RC = ({ node }) => {
   return createElement('#shadowRoot', {
     mode: 'open',
-    adoptedStylesheets: node.adoptedStylesheets,
+    adoptedStyleSheets: node.adoptedStyleSheets,
   }, <RenderChildNodes nodes={node.children} />);
 };
 

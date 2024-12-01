@@ -70,6 +70,7 @@ const nestedEl = el('div', [], [text('nested div')]);
 const secondDom = el('div', [attr('class', 'second-dom')], [el('div', [], [el('div', [], [nestedEl])])]);
 
 const initialDom = createEvent(RecordingEventType.INITIAL_DOM, section);
+const resize = createEvent(RecordingEventType.RESIZE, 800, 500);
 const mutation1 = createEvent(RecordingEventType.MUTATION_INSERT, divContainer.csId, yoloComment.csId, text("blablala"));
 const mutation2 = createEvent(RecordingEventType.MUTATION_INSERT, divContainer.csId, yoloComment.csId, text("blablala 2"));
 const mutation3 = createEvent(RecordingEventType.MUTATION_REMOVE, mutation1.args[2].csId);
@@ -81,4 +82,4 @@ const mutation8 = createEvent(RecordingEventType.INITIAL_DOM, secondDom);
 const mutation9 = createEvent(RecordingEventType.ATTACH_SHADOW, nestedEl.csId, shadowRoot(text('bonjour')));
 const mutation10 = createEvent(RecordingEventType.MUTATION_INSERT, secondDom.csId, undefined, elIframe([], section));
 
-export const recordingEvents = [initialDom, mutation1, mutation2, mutation3, mutation4, mutation5, mutation6, mutation7, mutation8, mutation9, mutation10];
+export const recordingEvents = [initialDom, resize, mutation1, mutation2, mutation3, mutation4, mutation5, mutation6, mutation7, mutation8, mutation9, mutation10];

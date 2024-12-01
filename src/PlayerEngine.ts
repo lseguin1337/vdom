@@ -261,6 +261,11 @@ export class PlaybackEngine {
     this.state.customElements = new Set([...this.state.customElements, localName]);
   }
 
+  @Play(RecordingEventType.RESIZE)
+  resize(width: number, height: number) {
+    this.state.viewport = { width, height };
+  }
+
   // TODO: handle all other events
 
   apply(events: RecordingEvent[]) {
