@@ -1,5 +1,5 @@
 
-import { createElement, createRef, FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { createElement, FC, useCallback, useEffect, useState } from 'react';
 import { VirtualDOM, VNode } from './PlayerEngine';
 import { createRoot } from './react-render';
 
