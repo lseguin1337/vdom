@@ -32,7 +32,7 @@ export interface VNode {
   contentDocument?: VNode;
   attributes?: VAttr[]; // TODO: do something to handle namespace
   children?: VNode[];
-  adoptedStylesheets?: VStyleSheet[];
+  adoptedStyleSheets?: VStyleSheet[];
   value?: string;
   checked?: boolean;
   selectedIndex?: number;

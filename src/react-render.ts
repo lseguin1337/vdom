@@ -8,12 +8,12 @@ const dirtyElementBuilder = new DirtyElementBuilder();
 // const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
-function appendChild(parent, child) {
+function appendChild(parent: Node, child: Node & { __shadowRoot?: any }) {
   if (child.nodeType === Node.DOCUMENT_FRAGMENT_NODE && child.__shadowRoot) {
-    const { mode, adoptedStylesheets } = child.__shadowRoot;
-    const shadowRoot = parent.attachShadow({ mode });
+    const { mode, adoptedStyleSheets } = child.__shadowRoot;
+    const shadowRoot = (parent as Element).attachShadow({ mode });
     child.__shadowRoot = shadowRoot;
-    shadowRoot.adoptedStylesheets = adoptedStylesheets || [];
+    shadowRoot.adoptedStyleSheets = adoptedStyleSheets || [];
     shadowRoot.appendChild(child);
   } else {
     parent.appendChild(child);
@@ -118,7 +118,7 @@ const ReactReconcilerInst = ReactReconciler({
         return createDoctype(document, newProps.qualifiedName, newProps.publicId, newProps.systemId);
       case '#shadowRoot':
         const fragment = document.createDocumentFragment();
-        fragment.__shadowRoot = { mode: newProps.mode, adoptedStylesheets: newProps.adoptedStylesheets };
+        fragment.__shadowRoot = { mode: newProps.mode, adoptedStyleSheets: newProps.adoptedStyleSheets };
         return fragment;
     }
 
@@ -170,8 +170,8 @@ const ReactReconcilerInst = ReactReconciler({
         console.warn('#doctype doesnt support mutation');
         return;
       case '#shadowRoot':
-        if (oldProps.adoptedStylesheets !== newProps.adoptedStylesheets) {
-          domElement.__shadowRoot.adoptedStylesheets = newProps.adoptedStylesheets || [];
+        if (oldProps.adoptedStyleSheets !== newProps.adoptedStyleSheets) {
+          domElement.__shadowRoot.adoptedStyleSheets = newProps.adoptedStyleSheets || [];
         }
         return;
     }
