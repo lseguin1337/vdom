@@ -29,6 +29,13 @@ function el(localName: string, attributes: (ReturnType<typeof attr>)[] = [], chi
   };
 }
 
+function elIframe(attributes: (ReturnType<typeof attr>)[] = [], contentDocument: any) {
+  return {
+    ...el('iframe', attributes),
+    contentDocument,
+  };
+}
+
 function text(data: string) {
   return {
     csId: nodeId++,
@@ -72,5 +79,6 @@ const mutation6 = createEvent(RecordingEventType.MUTATION_ATTRIBUTE, divContaine
 const mutation7 = createEvent(RecordingEventType.MUTATION_REMOVE, divContainer.csId);
 const mutation8 = createEvent(RecordingEventType.INITIAL_DOM, secondDom);
 const mutation9 = createEvent(RecordingEventType.ATTACH_SHADOW, nestedEl.csId, shadowRoot(text('bonjour')));
+const mutation10 = createEvent(RecordingEventType.MUTATION_INSERT, secondDom.csId, undefined, elIframe([], section));
 
-export const recordingEvents = [initialDom, mutation1, mutation2, mutation3, mutation4, mutation5, mutation6, mutation7, mutation8, mutation9];
+export const recordingEvents = [initialDom, mutation1, mutation2, mutation3, mutation4, mutation5, mutation6, mutation7, mutation8, mutation9, mutation10];

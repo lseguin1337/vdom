@@ -81,6 +81,16 @@ function normalizeAttributes(attributes) {
   return attrs;
 }
 
+function createDoctype(document: Document, qualifiedName: string, publicId: string, systemId: string) {
+  try {
+    return document.implementation.createDocumentType(qualifiedName, publicId, systemId);
+  } catch (e) {
+    if ("InvalidCharacterError" === e.name)
+      return dirtyElementBuilder.createDoctype(qualifiedName, publicId, systemId);
+    throw e;
+  }
+}
+
 const ReactReconcilerInst = ReactReconciler({
   now: Date.now,
   getRootHostContext: () => {
@@ -105,7 +115,7 @@ const ReactReconcilerInst = ReactReconciler({
       case '#comment':
         return document.createComment(newProps?.data || '');
       case '#doctype':
-        return document.implementation.createDocumentType(newProps.qualifiedName, newProps.publicId, newProps.systemId);
+        return createDoctype(document, newProps.qualifiedName, newProps.publicId, newProps.systemId);
       case '#shadowRoot':
         const fragment = document.createDocumentFragment();
         fragment.__shadowRoot = { mode: newProps.mode, adoptedStylesheets: newProps.adoptedStylesheets };
@@ -190,6 +200,11 @@ const ReactReconcilerInst = ReactReconciler({
 
     Object.keys(newProps).forEach(propName => {
       const propValue = newProps[propName];
+      if (oldProps[propName] === propValue)
+        return;
+      if (propName.startsWith('on') && typeof propValue === 'function')
+        return;
+
       if (propName === 'value' && 'value' in domElement) {
         domElement.value = propValue;
       } else {
