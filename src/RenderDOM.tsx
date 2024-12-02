@@ -123,8 +123,10 @@ const RenderNode: RC = ({ node }) => {
   return <SpecializedNode node={node} />;
 };
 
+const defaultMainFrameStyle = { border: 'none', width: '100%', height: '100%' };
+
 export const RenderDOM: FC<{ vdom: VirtualDOM }> = ({ vdom }) => {
   const onLoad = useChildDocRenderer(vdom.document);
-  // TODO: render window size
-  return <iframe style={{ border: 'none', width: '100%', height: '100%', ...vdom.viewport }} onLoad={onLoad} />;
+  const style = useMemo(() => ({ ...defaultMainFrameStyle, ...vdom.viewport }), [vdom.viewport]);
+  return <iframe style={style} onLoad={onLoad} />;
 };

@@ -23,6 +23,7 @@ interface VStyleSheet {
 // TODO: split this type in Specialized Type
 export interface VNode {
   id: VNodeId;
+  context?: VNodeId;
   nodeType: string;
   localName?: string;
   namespaceURI?: string;
@@ -41,6 +42,7 @@ export interface VNode {
   qualifiedName?: string;
   publicId?: string;
   systemId?: string;
+  isPaused?: boolean;
 }
 
 interface Touch {
@@ -58,6 +60,28 @@ function Type(eventType: RecordingEventType) {
     events[eventType] = method;
     Klass.__events = events;
   };
+}
+
+function createPropDecorator(name: string) {
+  return (target: any, method: any, index: number) => {
+    const Klass = target.constructor;
+    Klass.__args = Klass.__args || {};
+    Klass.__args[method] = Klass.__args[method] || [];
+    const argsMap = Klass.__args[method];
+    argsMap[index] = name;
+  };
+}
+
+function RefId() {
+  return createPropDecorator('nodeRefId');
+}
+
+function Ref() {
+  return createPropDecorator('nodeRef');
+}
+
+function Node() {
+  return createPropDecorator('node');
 }
 
 interface Size {
@@ -143,52 +167,48 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.INITIAL_DOM)
-  initialDOM(event: RecordingEvent) {
-    const [serializedNode] = event.args as [SerializedNode];
-    const document = this.toVNode(serializedNode, event.context, event.context);
-    if (event.context) {
-      const parentNode = this.getNode(event.context);
-      parentNode.contentDocument = document;
+  initialDOM(@Node() document: VNode) {
+    document.parentId = document.context;
+    if (document.parentId) {
+      const parent = this.getNode(document.parentId);
+      parent.contentDocument = document;
     } else {
       this.state.document = document;
     }
   }
 
   @Type(RecordingEventType.MUTATION_INSERT)
-  mutationInsert({ args, context }: RecordingEvent) {
-    const [parentId, nextSibling, serializedNode] = args as [number, number, SerializedNode];
-    const node = this.toVNode(serializedNode, context);
-    this.insertBefore(node, this.toVNodeId(parentId, context), this.toVNodeId(nextSibling, context));
+  mutationInsert(
+    @RefId() parentId: VNodeId,
+    @RefId() nextSiblingId: VNodeId | undefined,
+    @Node() node: VNode,
+  ) {
+    this.insertBefore(node, parentId, nextSiblingId);
   }
 
   @Type(RecordingEventType.MUTATION_MOVE)
-  mutationMove({ args, context }: RecordingEvent) {
-    const [nodeId, nextSibling, parentId] = args as [number, number, number];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
-    this.insertBefore(node, this.toVNodeId(parentId, context), this.toVNodeId(nextSibling, context));
+  mutationMove(
+    @Ref() node: VNode,
+    @RefId() nextSibling: VNodeId | undefined,
+    @RefId() parentId: VNodeId,
+  ) {
+    this.insertBefore(node, parentId, nextSibling);
   }
 
   @Type(RecordingEventType.MUTATION_REMOVE)
-  mutationRemove({ args, context }: RecordingEvent) {
-    const [nodeId] = args as [number];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  mutationRemove(@Ref() node: VNode) {
     this.detachNode(node);
     for (const curr of this.visitNode(node))
       delete this.nodes[curr.id];
   }
 
   @Type(RecordingEventType.MUTATION_CHARACTER_DATA)
-  mutationCharacterData({ args, context }: RecordingEvent) {
-    const [nodeId, data] = args as [number, string];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  mutationCharacterData(@Ref() node: VNode, data: string) {
     node.data = data;
   }
 
   @Type(RecordingEventType.MUTATION_ATTRIBUTE)
-  mutationAttribute({ args, context }: RecordingEvent) {
-    const [nodeId, attrNamespace, attrName, attrValue] = args as [number, string, string, string];
-    // TODO: handle namespaceURI
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  mutationAttribute(@Ref() node: VNode, attrNamespace: string, attrName: string, attrValue: string) {
     const attributes = node.attributes || [];
     const index = attributes.findIndex((attr) => !(attr.namespaceURI === attrNamespace && attr.name === attrName));
     if (attrValue === null || attrValue === undefined) {
@@ -202,38 +222,31 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.ATTACH_SHADOW)
-  attachShadow({ args, context }: RecordingEvent) {
-    const [targetId, serializedShadow] = args as [number, SerializedNode];
-    const nodeId = this.toVNodeId(targetId, context);
-    const node = this.getNode(nodeId);
-    node.shadowRoot = this.toVNode(serializedShadow, context, nodeId);
+  attachShadow(
+    @Ref() parent: VNode,
+    @Node() shadowRoot: VNode,
+  ) {
+    shadowRoot.parentId = parent.id;
+    parent.shadowRoot = shadowRoot;
   }
 
   @Type(RecordingEventType.INPUT_TEXT)
-  inputText({ args, context }: RecordingEvent) {
-    const [nodeId, text] = args as [number, string];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  inputText(@Ref() node: VNode, text: string) {
     node.value = text;
   }
 
   @Type(RecordingEventType.INPUT_CHECKABLE)
-  inputCheck({ args, context }: RecordingEvent) {
-    const [nodeId, checked] = args as [number, boolean];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  inputCheck(@Ref() node: VNode, checked: boolean) {
     node.checked = checked;
   }
 
   @Type(RecordingEventType.INPUT_SELECT)
-  inputSelect({ args, context }: RecordingEvent) {
-    const [nodeId, selectedIndex] = args as [number, number];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  inputSelect(@Ref() node: VNode, selectedIndex: number) {
     node.selectedIndex = selectedIndex;
   }
 
   @Type(RecordingEventType.SCROLL)
-  scroll({ args, context }: RecordingEvent) {
-    const [nodeId, left, top] = args as [number, number, number];
-    const node = this.getNode(this.toVNodeId(nodeId, context));
+  scroll(@Ref() node: VNode, left: number, top: number) {
     node.scrollTop = top;
     node.scrollLeft = left;
   }
@@ -249,26 +262,22 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.MOUSE_OVER)
-  mouseOver(event: RecordingEvent) {
-    const [nodeId] = event.args as [number];
-    this.state.cursor = { ...this.state.cursor, hover: this.toVNodeId(nodeId, event.context) };
+  mouseOver(@RefId() nodeId: VNodeId) {
+    this.state.cursor = { ...this.state.cursor, hover: nodeId };
   }
 
   @Type(RecordingEventType.MOUSE_MOVE)
-  mouseMove(event: RecordingEvent) {
-    const [x, y] = event.args as [number, number];
+  mouseMove(x: number, y: number) {
     this.state.cursor = { ...this.state.cursor, x, y };
   }
 
   @Type(RecordingEventType.TOUCH_START)
-  touchStart(event: RecordingEvent) {
-    const [fingerId, x, y] = event.args as [number, number, number];
+  touchStart(fingerId: number, x: number, y: number) {
     this.state.touches = [...this.state.touches, { id: fingerId, x, y }];
   }
 
   @Type(RecordingEventType.TOUCH_MOVE)
-  touchMove(event: RecordingEvent) {
-    const [fingerId, x, y] = event.args as [number, number, number];
+  touchMove(fingerId: number, x: number, y: number) {
     const index = this.state.touches.findIndex((touch) => touch.id === fingerId);
     this.state.touches[index] = {
       ...this.state.touches[index],
@@ -280,21 +289,43 @@ export class CSDom {
 
   @Type(RecordingEventType.TOUCH_END)
   @Type(RecordingEventType.TOUCH_CANCEL)
-  touchEnd(event: RecordingEvent) {
-    const [fingerId] = event.args as [number];
+  touchEnd(fingerId: number) {
     this.state.touches = this.state.touches.filter(touch => touch.id !== fingerId);
   }
 
   @Type(RecordingEventType.CUSTOM_ELEMENT_REGISTRATION)
-  customElementRegistration(event: RecordingEvent) {
-    const [localName] = event.args as [string];
+  customElementRegistration(localName: string) {
     this.state.customElements = new Set([...this.state.customElements, localName]);
   }
 
   @Type(RecordingEventType.RESIZE)
-  resize(event: RecordingEvent) {
-    const [width, height] = event.args as [number, number];
+  resize(width: number, height: number) {
     this.state.viewport = { width, height };
+  }
+
+  @Type(RecordingEventType.ADOPTED_STYLESHEET_RULE_DELETE)
+  adoptedStylesheetRuleDelete() {
+    // TODO: implement me
+  }
+
+  @Type(RecordingEventType.ADOPTED_STYLESHEET_RULE_INSERT)
+  adoptedStylesheetRuleInsert() {
+    // TODO: implement me
+  }
+
+  @Type(RecordingEventType.ADOPTED_STYLESHEET_RULE_UPDATE)
+  adoptedStylesheetRuleUpdate() {
+    // TODO: implement me
+  }
+
+  @Type(RecordingEventType.HTML_MEDIA_ELEMENT_PAUSE)
+  mediaElementPause(@Ref() node: VNode) {
+    node.isPaused = true;
+  }
+
+  @Type(RecordingEventType.HTML_MEDIA_ELEMENT_PLAY)
+  mediaElementPlay(@Ref() node: VNode) {
+    node.isPaused = false;
   }
 
   // TODO: handle all other events
@@ -302,9 +333,9 @@ export class CSDom {
   apply(events: RecordingEvent[]) {
     let isDirtyState = false;
     for (const event of events) {
-      const method = getMethodName(event.type);
+      const method = getMethodInfo(event.type);
       if (method) {
-        (this[method] as any)(event);
+        (this[method.name] as any)(...this.prepareArgs(method.args, event));
         isDirtyState = true;
       }
     }
@@ -312,6 +343,25 @@ export class CSDom {
       this.state = { ...this.state };
     }
     return this;
+  }
+
+  private prepareArgs(argsDef: string[], event: RecordingEvent) {
+    if (!argsDef?.length) return event.args;
+    if (argsDef[0] === 'event') return [event];
+    return event.args.map((value, idx) => {
+      switch (argsDef[idx]) {
+        case 'nodeRefId':
+          if (value === undefined || value === null)
+            return undefined;
+          return this.toVNodeId(value as number, event.context);
+        case 'nodeRef':
+          return this.getNode(this.toVNodeId(value as number, event.context));
+        case 'node':
+          return this.toVNode(value, event.context);
+        default:
+          return value;
+      }
+    });
   }
 
   private *visitNode(node: VNode): Generator<VNode> {
@@ -358,6 +408,7 @@ export class CSDom {
       contentDocument: contentDocument && this.toVNode(contentDocument, id, id),
       attributes,
       parentId,
+      context,
       ...props,
     };
     this.nodes[id] = node;
@@ -365,6 +416,12 @@ export class CSDom {
   }
 }
 
-function getMethodName(eventType: RecordingEventType): keyof CSDom | undefined {
-  return (CSDom as any).__events[eventType];
+function getMethodInfo(eventType: RecordingEventType) {
+  const methodName = (CSDom as any).__events[eventType] as keyof CSDom | undefined;
+  if (!methodName) return null;
+  const args = (CSDom as any).__args[methodName];
+  return {
+    name: methodName,
+    args,
+  };
 }
