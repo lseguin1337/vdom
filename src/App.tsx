@@ -20,7 +20,7 @@ function App() {
       csDom.apply(selectedEvents);
     }
     prevRenderAt = renderAt;
-    return csDom.getVirtualDOM();
+    return csDom.getState();
   }, [renderAt]);
 
   return (<>

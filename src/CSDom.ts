@@ -116,45 +116,9 @@ export class CSDom {
 
   constructor() {}
 
-  private markDirty(id: VNodeId) {
-    if (this.dirtyNodes.has(id)) return;
-    const node = this.nodes[id] = { ...this.nodes[id] };
-    this.dirtyNodes.add(id);
-    if (node.parentId) {
-      // make the parent dirty has well
-      const parent = this.getNode(node.parentId);
-      // update the children ref
-      const siblings = parent.children!;
-      const index = siblings.findIndex((child) => child.id === node.id);
-      if (index !== -1) {
-        siblings[index] = node;
-        parent.children = [...siblings];
-      } else if (parent.contentDocument?.id === node.id) {
-        parent.contentDocument = node;
-      } else if (parent.shadowRoot?.id === node.id) {
-        parent.shadowRoot = node;
-      } else {
-        console.warn('There is a bug (1) here, this log should never append');
-      }
-    } else if (node.id === this.state.document?.id) {
-      this.state.document = node;
-    } else {
-      console.warn('There is a bug (2) here, this log should never append');
-    }
-  }
-
-  getVirtualDOM() {
+  getState() {
     this.dirtyNodes.clear();
     return this.state;
-  }
-
-  toVNodeId(id: number, context: string | undefined): VNodeId {
-    return context ? `${context}/${id}` : `${id}`;
-  }
-
-  getNode(id: VNodeId) {
-    this.markDirty(id);
-    return this.nodes[id];
   }
 
   clear() {
@@ -164,8 +128,23 @@ export class CSDom {
     return this;
   }
 
+  apply(events: RecordingEvent[]) {
+    let isDirtyState = false;
+    for (const event of events) {
+      const method = this.getMethodInfo(event.type);
+      if (method) {
+        (this[method.name] as any)(...this.prepareArgs(method.args, event));
+        isDirtyState = true;
+      }
+    }
+    if (isDirtyState) {
+      this.state = { ...this.state };
+    }
+    return this;
+  }
+
   @Type(RecordingEventType.INITIAL_DOM)
-  initialDOM(@Node() document: VNode) {
+  protected initialDOM(@Node() document: VNode) {
     document.parentId = document.context;
     if (document.parentId) {
       const parent = this.getNode(document.parentId);
@@ -176,7 +155,7 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.MUTATION_INSERT)
-  mutationInsert(
+  protected mutationInsert(
     @RefId() parentId: VNodeId,
     @RefId() nextSiblingId: VNodeId | undefined,
     @Node() node: VNode,
@@ -185,7 +164,7 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.MUTATION_MOVE)
-  mutationMove(
+  protected mutationMove(
     @Ref() node: VNode,
     @RefId() nextSibling: VNodeId | undefined,
     @RefId() parentId: VNodeId,
@@ -194,25 +173,25 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.MUTATION_REMOVE)
-  mutationRemove(@Ref() node: VNode) {
+  protected mutationRemove(@Ref() node: VNode) {
     this.detachNode(node);
     for (const curr of this.visitNode(node))
       delete this.nodes[curr.id];
   }
 
   @Type(RecordingEventType.MUTATION_CHARACTER_DATA)
-  mutationCharacterData(@Ref() node: VNode, data: string) {
+  protected mutationCharacterData(@Ref() node: VNode, data: string) {
     node.data = data;
   }
 
   @Type(RecordingEventType.MUTATION_ATTRIBUTE)
-  mutationAttribute(@Ref() node: VNode, attrNamespace: string, attrName: string, attrValue: string) {
+  protected mutationAttribute(@Ref() node: VNode, attrNamespace: string, attrName: string, attrValue: string) {
     const attributes = node.attributes || [];
     const index = attributes.findIndex((attr) => !(attr.namespaceURI === attrNamespace && attr.name === attrName));
     if (attrValue === null || attrValue === undefined) {
-      node.attributes = node.attributes?.filter((_attr, i) => i !== index);
+      node.attributes = attributes.filter((_attr, i) => i !== index);
     } else if (index === -1) {
-      node.attributes = [...node.attributes || [], { namespaceURI: attrNamespace, name: attrName, value: attrValue }];
+      node.attributes = [...attributes, { namespaceURI: attrNamespace, name: attrName, value: attrValue }];
     } else {
       attributes[index] = { namespaceURI: attrNamespace, name: attrName, value: attrValue };
       node.attributes = [...attributes];
@@ -220,7 +199,7 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.ATTACH_SHADOW)
-  attachShadow(
+  protected attachShadow(
     @Ref() parent: VNode,
     @Node() shadowRoot: VNode,
   ) {
@@ -229,53 +208,53 @@ export class CSDom {
   }
 
   @Type(RecordingEventType.INPUT_TEXT)
-  inputText(@Ref() node: VNode, text: string) {
+  protected inputText(@Ref() node: VNode, text: string) {
     node.value = text;
   }
 
   @Type(RecordingEventType.INPUT_CHECKABLE)
-  inputCheck(@Ref() node: VNode, checked: boolean) {
+  protected inputCheck(@Ref() node: VNode, checked: boolean) {
     node.checked = checked;
   }
 
   @Type(RecordingEventType.INPUT_SELECT)
-  inputSelect(@Ref() node: VNode, selectedIndex: number) {
+  protected inputSelect(@Ref() node: VNode, selectedIndex: number) {
     node.selectedIndex = selectedIndex;
   }
 
   @Type(RecordingEventType.SCROLL)
-  scroll(@Ref() node: VNode, left: number, top: number) {
+  protected scroll(@Ref() node: VNode, left: number, top: number) {
     node.scrollTop = top;
     node.scrollLeft = left;
   }
 
   @Type(RecordingEventType.MOUSE_DOWN)
-  mouseDown() {
+  protected mouseDown() {
     this.state.cursor = { ...this.state.cursor, isPressed: true };
   }
 
   @Type(RecordingEventType.MOUSE_UP)
-  mouseUp() {
+  protected mouseUp() {
     this.state.cursor = { ...this.state.cursor, isPressed: false };
   }
 
   @Type(RecordingEventType.MOUSE_OVER)
-  mouseOver(@RefId() nodeId: VNodeId) {
+  protected mouseOver(@RefId() nodeId: VNodeId) {
     this.state.cursor = { ...this.state.cursor, hover: nodeId };
   }
 
   @Type(RecordingEventType.MOUSE_MOVE)
-  mouseMove(x: number, y: number) {
+  protected mouseMove(x: number, y: number) {
     this.state.cursor = { ...this.state.cursor, x, y };
   }
 
   @Type(RecordingEventType.TOUCH_START)
-  touchStart(fingerId: number, x: number, y: number) {
+  protected touchStart(fingerId: number, x: number, y: number) {
     this.state.touches = [...this.state.touches, { id: fingerId, x, y }];
   }
 
   @Type(RecordingEventType.TOUCH_MOVE)
-  touchMove(fingerId: number, x: number, y: number) {
+  protected touchMove(fingerId: number, x: number, y: number) {
     const index = this.state.touches.findIndex((touch) => touch.id === fingerId);
     this.state.touches[index] = {
       ...this.state.touches[index],
@@ -287,60 +266,50 @@ export class CSDom {
 
   @Type(RecordingEventType.TOUCH_END)
   @Type(RecordingEventType.TOUCH_CANCEL)
-  touchEnd(fingerId: number) {
+  protected touchEnd(fingerId: number) {
     this.state.touches = this.state.touches.filter(touch => touch.id !== fingerId);
   }
 
   @Type(RecordingEventType.CUSTOM_ELEMENT_REGISTRATION)
-  customElementRegistration(localName: string) {
+  protected customElementRegistration(localName: string) {
     this.state.customElements = new Set([...this.state.customElements, localName]);
   }
 
   @Type(RecordingEventType.RESIZE)
-  resize(width: number, height: number) {
+  protected resize(width: number, height: number) {
     this.state.viewport = { width, height };
   }
 
   @Type(RecordingEventType.ADOPTED_STYLESHEET_RULE_DELETE)
-  adoptedStylesheetRuleDelete() {
+  protected adoptedStylesheetRuleDelete() {
     // TODO: implement me
   }
 
   @Type(RecordingEventType.ADOPTED_STYLESHEET_RULE_INSERT)
-  adoptedStylesheetRuleInsert() {
+  protected adoptedStylesheetRuleInsert() {
     // TODO: implement me
   }
 
   @Type(RecordingEventType.ADOPTED_STYLESHEET_RULE_UPDATE)
-  adoptedStylesheetRuleUpdate() {
+  protected adoptedStylesheetRuleUpdate() {
     // TODO: implement me
   }
 
   @Type(RecordingEventType.HTML_MEDIA_ELEMENT_PAUSE)
-  mediaElementPause(@Ref() node: VNode) {
+  protected mediaElementPause(@Ref() node: VNode) {
     node.isPaused = true;
   }
 
   @Type(RecordingEventType.HTML_MEDIA_ELEMENT_PLAY)
-  mediaElementPlay(@Ref() node: VNode) {
+  protected mediaElementPlay(@Ref() node: VNode) {
     node.isPaused = false;
   }
 
   // TODO: handle all other events
 
-  apply(events: RecordingEvent[]) {
-    let isDirtyState = false;
-    for (const event of events) {
-      const method = getMethodInfo(event.type);
-      if (method) {
-        (this[method.name] as any)(...this.prepareArgs(method.args, event));
-        isDirtyState = true;
-      }
-    }
-    if (isDirtyState) {
-      this.state = { ...this.state };
-    }
-    return this;
+  private getNode(id: VNodeId) {
+    this.markDirty(id);
+    return this.nodes[id];
   }
 
   private prepareArgs(argsDef: string[], event: RecordingEvent) {
@@ -397,7 +366,11 @@ export class CSDom {
     }
   }
 
-  private toVNode({ csId, children, shadowRoot, contentDocument, attributes, ...props }: SerializedNode, context: string | undefined, parentId?: VNodeId): VNode {
+  private toVNodeId(id: number, context: string | undefined): VNodeId {
+    return context ? `${context}/${id}` : `${id}`;
+  }
+
+  private toVNode({ csId, children, shadowRoot, contentDocument, attributes, ...props }: SerializedNode, context: VNodeId | undefined, parentId?: VNodeId): VNode {
     const id = this.toVNodeId(csId, context);
     const node: VNode = {
       id,
@@ -410,16 +383,45 @@ export class CSDom {
       ...props,
     };
     this.nodes[id] = node;
+    this.dirtyNodes.add(id);
     return node;
   }
-}
 
-function getMethodInfo(eventType: RecordingEventType) {
-  const methodName = (CSDom as any).__events[eventType] as keyof CSDom | undefined;
-  if (!methodName) return null;
-  const args = (CSDom as any).__args[methodName];
-  return {
-    name: methodName,
-    args,
-  };
+  private markDirty(id: VNodeId) {
+    if (this.dirtyNodes.has(id)) return;
+    const node = this.nodes[id] = { ...this.nodes[id] };
+    this.dirtyNodes.add(id);
+    if (node.parentId) {
+      // make the parent dirty has well
+      const parent = this.getNode(node.parentId);
+      // update the child ref into the parent
+      const siblings = parent.children!;
+      const index = siblings.findIndex((child) => child.id === node.id);
+      if (index !== -1) {
+        siblings[index] = node;
+        parent.children = [...siblings];
+      } else if (parent.contentDocument?.id === node.id) {
+        parent.contentDocument = node;
+      } else if (parent.shadowRoot?.id === node.id) {
+        parent.shadowRoot = node;
+      } else {
+        console.warn('There is a bug (1) here, this log should never append');
+      }
+    } else if (node.id === this.state.document?.id) {
+      this.state.document = node;
+    } else {
+      console.warn('There is a bug (2) here, this log should never append');
+    }
+  }
+
+  private getMethodInfo(eventType: RecordingEventType) {
+    const Klass = this.constructor as any;
+    const methodName = Klass.__events[eventType] as keyof CSDom | undefined;
+    if (!methodName) return null;
+    const args = Klass.__args[methodName];
+    return {
+      name: methodName,
+      args,
+    };
+  }
 }
