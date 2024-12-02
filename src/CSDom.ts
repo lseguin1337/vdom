@@ -133,15 +133,13 @@ export class CSDom {
         parent.contentDocument = node;
       } else if (parent.shadowRoot?.id === node.id) {
         parent.shadowRoot = node;
-      }
-    }
-    else {
-      const oldDoc = this.state.document;
-      if (node.id === oldDoc?.id) {
-        this.state.document = node;
       } else {
-        console.warn('Something weird it should be always true');
+        console.warn('There is a bug (1) here, this log should never append');
       }
+    } else if (node.id === this.state.document?.id) {
+      this.state.document = node;
+    } else {
+      console.warn('There is a bug (2) here, this log should never append');
     }
   }
 
