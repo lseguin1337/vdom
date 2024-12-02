@@ -1,26 +1,26 @@
 import { useMemo, useState } from 'react';
 import { RenderDOM } from './RenderDOM'
-import { PlaybackEngine } from './PlayerEngine';
+import { CSDom } from './CSDom';
 import { recordingEvents } from './events';
 
 let prevRenderAt = 0;
-const playerEngine = new PlaybackEngine();
+const csDom = new CSDom();
 
 function App() {
   const [renderAt, setRenderAt] = useState(recordingEvents.length);
   const virtualDOM = useMemo(() => {
     if (prevRenderAt > renderAt) {
-      playerEngine.clear();
+      csDom.clear();
       prevRenderAt = 0;
       console.log('cleared vdom state');
     }
     const selectedEvents = recordingEvents.slice(prevRenderAt, renderAt);
     if (selectedEvents.length) {
       console.log('applied events:', selectedEvents);
-      playerEngine.apply(selectedEvents);
+      csDom.apply(selectedEvents);
     }
     prevRenderAt = renderAt;
-    return playerEngine.getVirtualDOM();
+    return csDom.getVirtualDOM();
   }, [renderAt]);
 
   return (<>

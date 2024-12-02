@@ -1,6 +1,6 @@
 
 import { createElement, FC, useCallback, useEffect, useMemo, useState } from 'react';
-import { VirtualDOM, VNode } from './PlayerEngine';
+import { VirtualDOM, VNode } from './CSDom';
 import { createRoot } from './react-render';
 
 type RC = FC<{ node: VNode }>;
